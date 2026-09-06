@@ -26,7 +26,13 @@
 # action uses peaceiris/actions-gh-pages (branch-based) + REST API,
 # not the OIDC `actions/deploy-pages` flow.
 name: Continuous Integration
-on: [push, pull_request]
+# workflow_dispatch is added on top of the wads stub: without it a run that ends
+# up in a non-rerunnable state (e.g. the action_required a brand-new repo can get
+# on its very first run) cannot be retriggered from the API or the UI at all.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 jobs:
   ci:
     uses: i2mint/wads/.github/workflows/uv-ci.yml@master
