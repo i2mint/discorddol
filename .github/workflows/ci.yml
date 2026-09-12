@@ -26,37 +26,22 @@
 # action uses peaceiris/actions-gh-pages (branch-based) + REST API,
 # not the OIDC `actions/deploy-pages` flow.
 name: Continuous Integration
-# workflow_dispatch is added on top of the wads stub: without it a run that ends
-# up in a non-rerunnable state (e.g. the action_required a brand-new repo can get
-# on its very first run) cannot be retriggered from the API or the UI at all.
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
+on: [push, pull_request]
 jobs:
   ci:
     uses: i2mint/wads/.github/workflows/uv-ci.yml@master
     permissions:
       contents: write
       pages: write
-    # Transport: this repo's whole `secrets` context, serialized into the one
-    # secret the reusable workflow declares. Double-encoded (toJSON twice) so
-    # the value is a single line — a multiline secret would register its `{`
-    # and `}` lines as global log masks. Any secret name works; there is no
-    # fixed list to fall outside of. (Cross-owner `secrets: inherit` does not
-    # propagate secrets, so it cannot replace this.)
+    # Transport (NAMED, legacy): explicitly passes only the secrets
+    # listed below (PYPI_PASSWORD + those declared in
+    # [tool.wads.ci.env]). Every name must be in the frozen wads
+    # superset (wads/ci_secrets.py) or GitHub rejects the workflow
+    # at parse time. The default JSON transport has no such limit;
+    # regenerate with `wads-migrate ci-to-stub` to switch.
     #
-    # Note this hands EVERY secret this repo can read — including org-level
-    # ones — to the called workflow. For a minimal secret surface (only the
-    # names you list), regenerate with
-    #   wads-migrate ci-to-stub --transport named
-    #
-    # *Which* of these become job env vars — and which are required — is
-    # driven entirely by [tool.wads.ci.env] in pyproject.toml; nothing is
-    # exported unless declared there (`wads-secrets add VAR_NAME` declares
-    # one and can set its value). Non-sensitive values don't need a secret:
-    # use [tool.wads.ci.env].defaults (committed literals) or a repository
-    # *variable* (`gh variable set NAME`) — declared names fall back to
-    # repo variables automatically.
+    # Keep the named transport here: while this stub passed the whole secrets
+    # context, GitHub held every run of this repository's CI (action_required,
+    # zero jobs). See i2mint/wads#74.
     secrets:
-      WADS_CI_SECRETS_JSON: ${{ toJSON(toJSON(secrets)) }}
+      PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
