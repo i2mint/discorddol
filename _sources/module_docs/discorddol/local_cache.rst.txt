@@ -1,0 +1,4 @@
+discorddol.local_cache
+======================
+.. automodule:: discorddol.local_cache
+   :members:

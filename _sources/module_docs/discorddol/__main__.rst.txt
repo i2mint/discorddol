@@ -1,0 +1,4 @@
+discorddol.__main__
+===================
+.. automodule:: discorddol.__main__
+   :members:

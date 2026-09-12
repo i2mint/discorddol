@@ -1,0 +1,695 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>discorddol.base &mdash; discorddol 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/toggleprompt.js?v=d7ede5d2"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            discorddol
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol.html">discorddol</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/__main__.html">discorddol.__main__</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/base.html">discorddol.base</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/local_cache.html">discorddol.local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tests/test_local_cache.html">discorddol.tests.test_local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tests/test_smoke.html">discorddol.tests.test_smoke</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tools.html">discorddol.tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">discorddol</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">discorddol.base</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for discorddol.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Core of discorddol: a Discord read backend and the ``Mapping`` stores over it.</span>
+
+<span class="sd">The design has one hinge: **the backend**. Everything user-facing is a ``Mapping``</span>
+<span class="sd">whose data comes from a backend object exposing four methods -- ``guilds``,</span>
+<span class="sd">``channels``, ``threads``, ``messages`` -- each returning plain JSON-able dicts. The</span>
+<span class="sd">default backend (:class:`DiscordRest`) talks to the live Discord API; swapping it for</span>
+<span class="sd">one that reads a Discord data export, or a dict of fixtures, changes nothing above it.</span>
+
+<span class="sd">The stores::</span>
+
+<span class="sd">    Guilds()                       # Mapping: guild name/id -&gt; Channels</span>
+<span class="sd">    Channels(guild_id)             # Mapping: channel name/id -&gt; list of message dicts</span>
+<span class="sd">    Channels(guild_id).info        # Mapping: channel name/id -&gt; channel metadata</span>
+
+<span class="sd">so the common case reads like plain Python::</span>
+
+<span class="sd">    from discorddol import Guilds</span>
+
+<span class="sd">    msgs = Guilds()['Cosmograph']['user-feedback']</span>
+
+<span class="sd">``DiscordRest`` uses discord.py in REST-only mode -- it logs in over HTTP but never</span>
+<span class="sd">opens a gateway connection. That makes every call a one-shot fetch that returns</span>
+<span class="sd">promptly, instead of a bot process you have to keep alive and shut down.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">MutableMapping</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Protocol</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"get_token"</span><span class="p">,</span>
+    <span class="s2">"message_to_dict"</span><span class="p">,</span>
+    <span class="s2">"channel_to_dict"</span><span class="p">,</span>
+    <span class="s2">"DiscordRest"</span><span class="p">,</span>
+    <span class="s2">"DictBackend"</span><span class="p">,</span>
+    <span class="s2">"Channels"</span><span class="p">,</span>
+    <span class="s2">"Guilds"</span><span class="p">,</span>
+    <span class="s2">"as_text"</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="n">DFLT_TOKEN_KEY</span> <span class="o">=</span> <span class="s2">"DISCORD_BOT_TOKEN"</span>
+
+
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+<span class="c1"># Seam 1: where the token comes from</span>
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="get_token">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.get_token">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_token</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DFLT_TOKEN_KEY</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Resolve a Discord token: environment variable first, then the config2py store.</span>
+
+<span class="sd">    Raises a :class:`RuntimeError` naming the exact fix rather than a bare ``KeyError``,</span>
+<span class="sd">    because a missing token is the single most common first-run failure.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">:=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">config2py</span><span class="w"> </span><span class="kn">import</span> <span class="n">simple_config_getter</span>
+
+        <span class="n">token</span> <span class="o">=</span> <span class="n">simple_config_getter</span><span class="p">()(</span><span class="n">key</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 -- the actionable message beats the trace</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">_missing_token_message</span><span class="p">(</span><span class="n">key</span><span class="p">))</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">token</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">_missing_token_message</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">token</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_missing_token_message</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"No Discord token found under </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="sa">f</span><span class="s2">"Fix it with either:</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="sa">f</span><span class="s2">"  export </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=...</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="sa">f</span><span class="s1">'  printf %s "&lt;token&gt;" &gt; ~/.config/config2py/configs/</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="sa">f</span><span class="s2">"Get a token at https://discord.com/developers/applications "</span>
+        <span class="sa">f</span><span class="s2">"-&gt; your app -&gt; Bot -&gt; Reset Token.</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="sa">f</span><span class="s1">'Remember to enable the "Message Content Intent" on that same Bot page, '</span>
+        <span class="sa">f</span><span class="s2">"or message bodies come back empty."</span>
+    <span class="p">)</span>
+
+
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+<span class="c1"># Seam 3: the record schema</span>
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="message_to_dict">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.message_to_dict">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">message_to_dict</span><span class="p">(</span><span class="n">message</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Serialize a ``discord.Message`` to a plain, JSON-safe dict."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">attachment</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"filename"</span><span class="p">:</span> <span class="n">a</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="s2">"url"</span><span class="p">:</span> <span class="n">a</span><span class="o">.</span><span class="n">url</span><span class="p">,</span> <span class="s2">"size"</span><span class="p">:</span> <span class="n">a</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">id</span><span class="p">)}</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+        <span class="s2">"channel_id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">channel</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+        <span class="s2">"created_at"</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+        <span class="s2">"edited_at"</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">edited_at</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span> <span class="k">if</span> <span class="n">message</span><span class="o">.</span><span class="n">edited_at</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"author"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">author</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">author</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="s2">"display_name"</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span>
+                <span class="n">message</span><span class="o">.</span><span class="n">author</span><span class="p">,</span> <span class="s2">"display_name"</span><span class="p">,</span> <span class="n">message</span><span class="o">.</span><span class="n">author</span><span class="o">.</span><span class="n">name</span>
+            <span class="p">),</span>
+            <span class="s2">"bot"</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">author</span><span class="o">.</span><span class="n">bot</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="s2">"content"</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">content</span><span class="p">,</span>
+        <span class="s2">"clean_content"</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">clean_content</span><span class="p">,</span>
+        <span class="s2">"attachments"</span><span class="p">:</span> <span class="p">[</span><span class="n">attachment</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">message</span><span class="o">.</span><span class="n">attachments</span><span class="p">],</span>
+        <span class="s2">"embeds"</span><span class="p">:</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">message</span><span class="o">.</span><span class="n">embeds</span><span class="p">],</span>
+        <span class="s2">"reactions"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s2">"emoji"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">emoji</span><span class="p">),</span> <span class="s2">"count"</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">count</span><span class="p">}</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">message</span><span class="o">.</span><span class="n">reactions</span>
+        <span class="p">],</span>
+        <span class="s2">"reply_to"</span><span class="p">:</span> <span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">reference</span><span class="o">.</span><span class="n">message_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">message</span><span class="o">.</span><span class="n">reference</span> <span class="ow">and</span> <span class="n">message</span><span class="o">.</span><span class="n">reference</span><span class="o">.</span><span class="n">message_id</span>
+            <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">),</span>
+        <span class="s2">"pinned"</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">pinned</span><span class="p">,</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">type</span><span class="p">),</span>
+        <span class="s2">"jump_url"</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">jump_url</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="channel_to_dict">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.channel_to_dict">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">channel_to_dict</span><span class="p">(</span><span class="n">channel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Serialize a channel or thread to a plain dict."""</span>
+    <span class="n">guild</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"guild"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">channel</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+        <span class="s2">"name"</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"type"</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">channel</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)),</span>
+        <span class="s2">"category"</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s2">"name"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="s2">"topic"</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"topic"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="s2">"created_at"</span><span class="p">:</span> <span class="p">(</span>
+            <span class="n">channel</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"created_at"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">),</span>
+        <span class="s2">"guild_id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">guild</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">if</span> <span class="n">guild</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"guild_name"</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">guild</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="s2">"parent_id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">channel</span><span class="o">.</span><span class="n">parent_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"parent_id"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"is_thread"</span><span class="p">:</span> <span class="nb">type</span><span class="p">(</span><span class="n">channel</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"Thread"</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+<span class="c1"># Seam 2: the backend</span>
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Backend</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""What a discorddol backend must provide. Four methods, all returning plain dicts."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">guilds</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">guild_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">threads</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">messages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
+
+
+<div class="viewcode-block" id="DiscordRest">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.DiscordRest">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DiscordRest</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Live Discord backend: discord.py in REST-only mode (login, no gateway).</span>
+
+<span class="sd">    &gt;&gt;&gt; backend = DiscordRest(token='fake')  # no network happens until a call is made</span>
+<span class="sd">    &gt;&gt;&gt; backend.token</span>
+<span class="sd">    'fake'</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">message_to_dict</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="n">message_to_dict</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_token</span> <span class="o">=</span> <span class="n">token</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">message_to_dict</span> <span class="o">=</span> <span class="n">message_to_dict</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">token</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The token, resolved lazily so constructing a backend never needs credentials."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_token</span> <span class="o">=</span> <span class="n">get_token</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_token</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coro_factory</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Log in, run one interaction, close. No gateway connection is opened."""</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">discord</span>
+
+        <span class="n">token</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">token</span>
+
+        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+            <span class="n">client</span> <span class="o">=</span> <span class="n">discord</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">intents</span><span class="o">=</span><span class="n">discord</span><span class="o">.</span><span class="n">Intents</span><span class="o">.</span><span class="n">none</span><span class="p">())</span>
+            <span class="k">async</span> <span class="k">with</span> <span class="n">client</span><span class="p">:</span>
+                <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+                <span class="k">return</span> <span class="k">await</span> <span class="n">coro_factory</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
+
+<div class="viewcode-block" id="DiscordRest.guilds">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.DiscordRest.guilds">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">guilds</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""List servers the bot has been added to."""</span>
+
+        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">client</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="p">{</span><span class="s2">"id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">id</span><span class="p">),</span> <span class="s2">"name"</span><span class="p">:</span> <span class="n">g</span><span class="o">.</span><span class="n">name</span><span class="p">}</span>
+                <span class="k">async</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">client</span><span class="o">.</span><span class="n">fetch_guilds</span><span class="p">(</span><span class="n">limit</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+            <span class="p">]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span><span class="n">fetch</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DiscordRest.channels">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.DiscordRest.channels">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">guild_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""List a guild's channels, including its currently active threads."""</span>
+
+        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">client</span><span class="p">):</span>
+            <span class="n">guild</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">fetch_guild</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">guild_id</span><span class="p">))</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="k">await</span> <span class="n">guild</span><span class="o">.</span><span class="n">fetch_channels</span><span class="p">())</span>
+            <span class="n">found</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="k">await</span> <span class="n">guild</span><span class="o">.</span><span class="n">active_threads</span><span class="p">())</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">channel_to_dict</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">found</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span><span class="n">fetch</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DiscordRest.threads">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.DiscordRest.threads">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">threads</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""List a channel's threads, archived ones included -- often where the content is."""</span>
+
+        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">client</span><span class="p">):</span>
+            <span class="n">channel</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">fetch_channel</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">channel_id</span><span class="p">))</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"archived_threads"</span><span class="p">):</span>
+                <span class="n">found</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">t</span> <span class="k">async</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">channel</span><span class="o">.</span><span class="n">archived_threads</span><span class="p">(</span><span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">)])</span>
+            <span class="n">guild</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="s2">"guild"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">guild</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">found</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="n">t</span>
+                        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="k">await</span> <span class="n">guild</span><span class="o">.</span><span class="n">active_threads</span><span class="p">()</span>
+                        <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">parent_id</span> <span class="o">==</span> <span class="n">channel</span><span class="o">.</span><span class="n">id</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">channel_to_dict</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">found</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span><span class="n">fetch</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DiscordRest.messages">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.DiscordRest.messages">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">messages</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">limit</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">after</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">before</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">oldest_first</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Fetch a channel's message history. ``limit=None`` means the whole thing."""</span>
+
+        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">client</span><span class="p">):</span>
+            <span class="n">channel</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">fetch_channel</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">channel_id</span><span class="p">))</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">message_to_dict</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+                <span class="k">async</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">channel</span><span class="o">.</span><span class="n">history</span><span class="p">(</span>
+                    <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="n">after</span><span class="p">,</span> <span class="n">before</span><span class="o">=</span><span class="n">before</span><span class="p">,</span> <span class="n">oldest_first</span><span class="o">=</span><span class="n">oldest_first</span>
+                <span class="p">)</span>
+            <span class="p">]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span><span class="n">fetch</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DiscordRest.send_message">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.DiscordRest.send_message">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">send_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Post a message to a channel. The one write operation; needs Send Messages.</span>
+
+<span class="sd">        Read access is what discorddol is for -- this exists so that acting on what you</span>
+<span class="sd">        read does not require a second library.</span>
+<span class="sd">        """</span>
+
+        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="n">client</span><span class="p">):</span>
+            <span class="n">channel</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">fetch_channel</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">channel_id</span><span class="p">))</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">message_to_dict</span><span class="p">(</span><span class="k">await</span> <span class="n">channel</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span><span class="n">send</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DictBackend">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.DictBackend">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DictBackend</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""In-memory backend over plain dicts. Real enough for tests, fixtures and exports.</span>
+
+<span class="sd">    &gt;&gt;&gt; backend = DictBackend(</span>
+<span class="sd">    ...     guilds=[{'id': '1', 'name': 'Cosmograph'}],</span>
+<span class="sd">    ...     channels={'1': [{'id': '10', 'name': 'dev'}]},</span>
+<span class="sd">    ...     messages={'10': [{'id': '100', 'content': 'hi'}]},</span>
+<span class="sd">    ... )</span>
+<span class="sd">    &gt;&gt;&gt; backend.guilds()</span>
+<span class="sd">    [{'id': '1', 'name': 'Cosmograph'}]</span>
+<span class="sd">    &gt;&gt;&gt; backend.messages('10')</span>
+<span class="sd">    [{'id': '100', 'content': 'hi'}]</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">guilds</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">channels</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Mapping</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">messages</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Mapping</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">threads</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Mapping</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_guilds</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">guilds</span> <span class="ow">or</span> <span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_channels</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">channels</span> <span class="ow">or</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_messages</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">messages</span> <span class="ow">or</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_threads</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">threads</span> <span class="ow">or</span> <span class="p">{})</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">guilds</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_guilds</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">channels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">guild_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_channels</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">guild_id</span><span class="p">),</span> <span class="p">()))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">threads</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_threads</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">channel_id</span><span class="p">),</span> <span class="p">()))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">messages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_messages</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">channel_id</span><span class="p">),</span> <span class="p">()))</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">limit</span> <span class="o">:=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"limit"</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="n">found</span><span class="p">[:</span><span class="n">limit</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">found</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_dflt_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">,</span> <span class="n">token</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">DiscordRest</span><span class="p">(</span><span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span> <span class="k">if</span> <span class="n">backend</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">backend</span>
+
+
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+<span class="c1"># The stores</span>
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_ChannelInfo</span><span class="p">(</span><span class="n">Mapping</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Mapping: channel name (or id) -&gt; channel metadata dict."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channels</span><span class="p">:</span> <span class="s2">"Channels"</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_channels</span> <span class="o">=</span> <span class="n">channels</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_channels</span><span class="o">.</span><span class="n">_records</span><span class="p">()[</span><span class="bp">self</span><span class="o">.</span><span class="n">_channels</span><span class="o">.</span><span class="n">_resolve</span><span class="p">(</span><span class="n">key</span><span class="p">)]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_channels</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_channels</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Channels">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.Channels">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Channels</span><span class="p">(</span><span class="n">Mapping</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Mapping of one guild's channels: key -&gt; list of message dicts.</span>
+
+<span class="sd">    Keys are channel names when unambiguous, and channel ids otherwise. Lookup accepts</span>
+<span class="sd">    either form, plus a leading ``#``, so ``channels['#dev']`` and ``channels['dev']``</span>
+<span class="sd">    and ``channels['10']`` all work.</span>
+
+<span class="sd">    &gt;&gt;&gt; backend = DictBackend(</span>
+<span class="sd">    ...     channels={'1': [{'id': '10', 'name': 'dev'}, {'id': '11', 'name': 'feedback'}]},</span>
+<span class="sd">    ...     messages={'10': [{'id': '100', 'content': 'hi'}]},</span>
+<span class="sd">    ... )</span>
+<span class="sd">    &gt;&gt;&gt; channels = Channels('1', backend=backend)</span>
+<span class="sd">    &gt;&gt;&gt; sorted(channels)</span>
+<span class="sd">    ['dev', 'feedback']</span>
+<span class="sd">    &gt;&gt;&gt; channels['dev']</span>
+<span class="sd">    [{'id': '100', 'content': 'hi'}]</span>
+<span class="sd">    &gt;&gt;&gt; channels.info['dev']['id']</span>
+<span class="sd">    '10'</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">guild_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">backend</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Backend</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">cache_store</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">MutableMapping</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">include_threads</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">message_kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">guild_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">guild_id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">_dflt_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_store</span> <span class="o">=</span> <span class="n">cache_store</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">include_threads</span> <span class="o">=</span> <span class="n">include_threads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">message_kwargs</span> <span class="o">=</span> <span class="n">message_kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">info</span> <span class="o">=</span> <span class="n">_ChannelInfo</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_records</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""key -&gt; channel record. Fetched once per instance; call ``refresh`` to redo."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">channels</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">guild_id</span><span class="p">)</span>
+            <span class="n">by_name</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+                <span class="n">by_name</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">record</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="p">(</span><span class="n">name</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">group</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s2">"id"</span><span class="p">]):</span> <span class="n">group</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">by_name</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">))</span>
+            <span class="p">}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span>
+
+<div class="viewcode-block" id="Channels.refresh">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.Channels.refresh">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">refresh</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channels"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Drop the cached channel listing so the next access refetches it."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Map a user-supplied key (name, '#name', or id) onto a store key."""</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s2">"#"</span><span class="p">)</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">key</span>
+        <span class="k">for</span> <span class="n">store_key</span><span class="p">,</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span> <span class="o">==</span> <span class="n">key</span> <span class="ow">or</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span> <span class="o">==</span> <span class="n">key</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">store_key</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"No channel </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2"> in guild </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">guild_id</span><span class="si">}</span><span class="s2">. "</span>
+            <span class="sa">f</span><span class="s2">"Available: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">records</span><span class="p">)[:</span><span class="mi">20</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span> <span class="o">+</span> <span class="p">(</span><span class="s2">"..."</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">20</span> <span class="k">else</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="n">store_key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">channel_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span><span class="p">()[</span><span class="n">store_key</span><span class="p">][</span><span class="s2">"id"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_store</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">channel_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_store</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_store</span><span class="p">[</span><span class="n">channel_id</span><span class="p">]</span>
+        <span class="n">messages</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">messages</span><span class="p">(</span><span class="n">channel_id</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">message_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">include_threads</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">thread</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">threads</span><span class="p">(</span><span class="n">channel_id</span><span class="p">):</span>
+                <span class="n">messages</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">messages</span><span class="p">(</span><span class="n">thread</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">message_kwargs</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="n">messages</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="n">m</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"created_at"</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_store</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cache_store</span><span class="p">[</span><span class="n">channel_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">messages</span>
+        <span class="k">return</span> <span class="n">messages</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_records</span><span class="p">())</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_records</span><span class="p">())</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">guild_id</span><span class="si">!r}</span><span class="s2">)"</span></div>
+
+
+
+<div class="viewcode-block" id="Guilds">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.Guilds">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Guilds</span><span class="p">(</span><span class="n">Mapping</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Mapping of the servers the bot can see: key -&gt; :class:`Channels`.</span>
+
+<span class="sd">    Keys are guild names when unambiguous, ids otherwise; lookup accepts either.</span>
+
+<span class="sd">    &gt;&gt;&gt; backend = DictBackend(</span>
+<span class="sd">    ...     guilds=[{'id': '1', 'name': 'Cosmograph'}],</span>
+<span class="sd">    ...     channels={'1': [{'id': '10', 'name': 'dev'}]},</span>
+<span class="sd">    ...     messages={'10': [{'id': '100', 'content': 'hi'}]},</span>
+<span class="sd">    ... )</span>
+<span class="sd">    &gt;&gt;&gt; guilds = Guilds(backend=backend)</span>
+<span class="sd">    &gt;&gt;&gt; list(guilds)</span>
+<span class="sd">    ['Cosmograph']</span>
+<span class="sd">    &gt;&gt;&gt; guilds['Cosmograph']['dev']</span>
+<span class="sd">    [{'id': '100', 'content': 'hi'}]</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">backend</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Backend</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">cache_store</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">MutableMapping</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">channels_kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">_dflt_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_store</span> <span class="o">=</span> <span class="n">cache_store</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">channels_kwargs</span> <span class="o">=</span> <span class="n">channels_kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_records</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">guilds</span><span class="p">()</span>
+            <span class="n">by_name</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+                <span class="n">by_name</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">record</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="p">(</span><span class="n">name</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">group</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s2">"id"</span><span class="p">]):</span> <span class="n">group</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">by_name</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">))</span>
+            <span class="p">}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records_cache</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">key</span>
+        <span class="k">for</span> <span class="n">store_key</span><span class="p">,</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span> <span class="o">==</span> <span class="n">key</span> <span class="ow">or</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span> <span class="o">==</span> <span class="n">key</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">store_key</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No guild </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2">. Available: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">records</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Channels</span><span class="p">:</span>
+        <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_records</span><span class="p">()[</span><span class="bp">self</span><span class="o">.</span><span class="n">_resolve</span><span class="p">(</span><span class="n">key</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">Channels</span><span class="p">(</span>
+            <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span>
+            <span class="n">backend</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span>
+            <span class="n">cache_store</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cache_store</span><span class="p">,</span>
+            <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">channels_kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_records</span><span class="p">())</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_records</span><span class="p">())</span></div>
+
+
+
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+<span class="c1"># Rendering</span>
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="as_text">
+<a class="viewcode-back" href="../../module_docs/discorddol/base.html#discorddol.as_text">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">as_text</span><span class="p">(</span><span class="n">messages</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_timestamps</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Render message dicts as a readable transcript -- the form you feed to an LLM.</span>
+
+<span class="sd">    &gt;&gt;&gt; print(as_text([{'created_at': '2026-09-04T10:00:00',</span>
+<span class="sd">    ...                 'author': {'display_name': 'thor'},</span>
+<span class="sd">    ...                 'clean_content': 'hello'}]))</span>
+<span class="sd">    [2026-09-04T10:00] thor: hello</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">line</span><span class="p">(</span><span class="n">m</span><span class="p">):</span>
+        <span class="n">who</span> <span class="o">=</span> <span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"author"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"display_name"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">)</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"clean_content"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">m</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"content"</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">""</span>
+        <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">m</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"attachments"</span><span class="p">,</span> <span class="p">()):</span>
+            <span class="n">body</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">    [attachment: </span><span class="si">{</span><span class="n">a</span><span class="p">[</span><span class="s1">'filename'</span><span class="p">]</span><span class="si">}</span><span class="s2">]"</span>
+        <span class="n">stamp</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'created_at'</span><span class="p">)</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">''</span><span class="p">)[:</span><span class="mi">16</span><span class="p">]</span><span class="si">}</span><span class="s2">] "</span> <span class="k">if</span> <span class="n">with_timestamps</span> <span class="k">else</span> <span class="s2">""</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">stamp</span><span class="si">}{</span><span class="n">who</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">body</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="k">return</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">messages</span><span class="p">))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

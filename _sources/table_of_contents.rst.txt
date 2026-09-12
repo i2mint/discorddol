@@ -1,0 +1,11 @@
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   module_docs/discorddol
+   module_docs/discorddol/__main__
+   module_docs/discorddol/base
+   module_docs/discorddol/local_cache
+   module_docs/discorddol/tests/test_local_cache
+   module_docs/discorddol/tests/test_smoke
+   module_docs/discorddol/tools

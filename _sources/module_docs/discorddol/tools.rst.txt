@@ -1,0 +1,4 @@
+discorddol.tools
+================
+.. automodule:: discorddol.tools
+   :members:

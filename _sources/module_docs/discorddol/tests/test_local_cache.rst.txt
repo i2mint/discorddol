@@ -1,0 +1,4 @@
+discorddol.tests.test_local_cache
+=================================
+.. automodule:: discorddol.tests.test_local_cache
+   :members:

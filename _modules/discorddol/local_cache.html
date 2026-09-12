@@ -1,0 +1,397 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>discorddol.local_cache &mdash; discorddol 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/toggleprompt.js?v=d7ede5d2"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            discorddol
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol.html">discorddol</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/__main__.html">discorddol.__main__</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/base.html">discorddol.base</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/local_cache.html">discorddol.local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tests/test_local_cache.html">discorddol.tests.test_local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tests/test_smoke.html">discorddol.tests.test_smoke</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tools.html">discorddol.tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">discorddol</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">discorddol.local_cache</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for discorddol.local_cache</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Read the Discord desktop client's on-disk HTTP cache -- including for deleted channels.</span>
+
+<span class="sd">Discord has no undelete: deleting a channel destroys its messages server-side, and no</span>
+<span class="sd">API, bot or owner permission brings them back. But the desktop client is an Electron</span>
+<span class="sd">app, so every attachment it ever displayed passed through Chromium's HTTP cache and the</span>
+<span class="sd">**bytes are still on disk**. Attachment URLs embed the channel id::</span>
+
+<span class="sd">    https://cdn.discordapp.com/attachments/{channel_id}/{attachment_id}/{filename}</span>
+
+<span class="sd">which gives a recovery path for a channel that no longer exists:</span>
+
+<span class="sd">1. :func:`cached_channel_ids` -- every channel id with cached attachments.</span>
+<span class="sd">2. :func:`orphan_channel_ids` -- those that no longer resolve against the live API.</span>
+<span class="sd">   A deleted channel shows up here.</span>
+<span class="sd">3. :func:`extract_channel_attachments` -- write those bytes back out to real files.</span>
+
+<span class="sd">Step 3 matters because Discord attachment URLs are signed and expire, so re-downloading</span>
+<span class="sd">them is not an option even when you know the URL. The cache holds the payload itself.</span>
+
+<span class="sd">Message **text** is not recoverable this way -- Discord's API responses are sent</span>
+<span class="sd">``no-store`` and never hit the disk cache. For text, request your Discord data export</span>
+<span class="sd">(Settings -&gt; Data &amp; Privacy -&gt; Request all of my Data), which files your own sent</span>
+<span class="sd">messages by channel id, including channels that no longer exist. The channel id from</span>
+<span class="sd">step 2 is what lets you find the right folder in that export.</span>
+
+<span class="sd">This is a read-only reader. It never writes to, moves, or deletes anything in the live</span>
+<span class="sd">cache directory, which the running Discord client owns.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"discord_cache_dir"</span><span class="p">,</span>
+    <span class="s2">"cached_attachment_refs"</span><span class="p">,</span>
+    <span class="s2">"cached_channel_ids"</span><span class="p">,</span>
+    <span class="s2">"orphan_channel_ids"</span><span class="p">,</span>
+    <span class="s2">"extract_channel_attachments"</span><span class="p">,</span>
+    <span class="s2">"CachedAttachments"</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="c1"># Chromium "simple cache" entry markers. The payload of an entry sits between the key</span>
+<span class="c1"># (the URL) and the EOF record; we bound extraction with the EOF magic when present.</span>
+<span class="n">SIMPLE_CACHE_EOF_MAGIC</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"</span><span class="se">\xd8\x41\x0d\x97\x45\x6f\xfa\xf4</span><span class="s2">"</span>
+
+<span class="c1"># The filename is one URL path segment, so it cannot contain '/', a query delimiter,</span>
+<span class="c1"># whitespace, a quote, or a control byte. Bounding it that tightly matters: cache entries</span>
+<span class="c1"># are binary, and a looser class runs the match past the URL into whatever follows it.</span>
+<span class="n">ATTACHMENT_URL_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">rb</span><span class="s2">"(?:cdn|media)\.discordapp\.(?:com|net)/(?:ephemeral-)?attachments/"</span>
+    <span class="sa">rb</span><span class="s1">'(\d+)/(\d+)/([^\s"</span><span class="se">\'</span><span class="s1">?&amp;/</span><span class="se">\\</span><span class="s1">&lt;&gt;\x00-\x1f]{1,200})'</span>
+<span class="p">)</span>
+
+<span class="c1"># (magic bytes, extension) -- how we find where a payload starts inside a cache entry.</span>
+<span class="n">FILE_MAGICS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\x89</span><span class="s2">PNG</span><span class="se">\r\n\x1a\n</span><span class="s2">"</span><span class="p">,</span> <span class="s2">".png"</span><span class="p">),</span>
+    <span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\xff\xd8\xff</span><span class="s2">"</span><span class="p">,</span> <span class="s2">".jpg"</span><span class="p">),</span>
+    <span class="p">(</span><span class="sa">b</span><span class="s2">"GIF87a"</span><span class="p">,</span> <span class="s2">".gif"</span><span class="p">),</span>
+    <span class="p">(</span><span class="sa">b</span><span class="s2">"GIF89a"</span><span class="p">,</span> <span class="s2">".gif"</span><span class="p">),</span>
+    <span class="p">(</span><span class="sa">b</span><span class="s2">"%PDF-"</span><span class="p">,</span> <span class="s2">".pdf"</span><span class="p">),</span>
+    <span class="p">(</span><span class="sa">b</span><span class="s2">"RIFF"</span><span class="p">,</span> <span class="s2">".webp"</span><span class="p">),</span>
+    <span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\x1a</span><span class="s2">E</span><span class="se">\xdf\xa3</span><span class="s2">"</span><span class="p">,</span> <span class="s2">".webm"</span><span class="p">),</span>
+    <span class="p">(</span><span class="sa">b</span><span class="s2">"PK</span><span class="se">\x03\x04</span><span class="s2">"</span><span class="p">,</span> <span class="s2">".zip"</span><span class="p">),</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="discord_cache_dir">
+<a class="viewcode-back" href="../../module_docs/discorddol/local_cache.html#discorddol.discord_cache_dir">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">discord_cache_dir</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">app</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"discord"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Default Discord desktop cache directory for this platform.</span>
+
+<span class="sd">    &gt;&gt;&gt; isinstance(discord_cache_dir(), Path)</span>
+<span class="sd">    True</span>
+<span class="sd">    """</span>
+    <span class="n">home</span> <span class="o">=</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"darwin"</span><span class="p">:</span>
+        <span class="n">base</span> <span class="o">=</span> <span class="n">home</span> <span class="o">/</span> <span class="s2">"Library"</span> <span class="o">/</span> <span class="s2">"Application Support"</span> <span class="o">/</span> <span class="n">app</span>
+    <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"win32"</span><span class="p">:</span>
+        <span class="n">base</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"APPDATA"</span><span class="p">,</span> <span class="n">home</span><span class="p">))</span> <span class="o">/</span> <span class="n">app</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">base</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"XDG_CONFIG_HOME"</span><span class="p">,</span> <span class="n">home</span> <span class="o">/</span> <span class="s2">".config"</span><span class="p">))</span> <span class="o">/</span> <span class="n">app</span>
+    <span class="k">return</span> <span class="n">base</span> <span class="o">/</span> <span class="s2">"Cache"</span> <span class="o">/</span> <span class="s2">"Cache_Data"</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cache_files</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+    <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">)</span> <span class="k">if</span> <span class="n">cache_dir</span> <span class="k">else</span> <span class="n">discord_cache_dir</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"No Discord cache directory at </span><span class="si">{</span><span class="n">cache_dir</span><span class="si">}</span><span class="s2">. "</span>
+            <span class="sa">f</span><span class="s2">"Pass cache_dir= explicitly, or point it at a snapshot copy."</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">iterdir</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">path</span>
+
+
+<div class="viewcode-block" id="cached_attachment_refs">
+<a class="viewcode-back" href="../../module_docs/discorddol/local_cache.html#discorddol.cached_attachment_refs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cached_attachment_refs</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">cache_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Yield one record per cached attachment URL found in the cache.</span>
+
+<span class="sd">    Each record has ``channel_id``, ``attachment_id``, ``filename`` and ``cache_file``.</span>
+<span class="sd">    Streams rather than accumulating, so a multi-gigabyte cache stays cheap to scan.</span>
+<span class="sd">    """</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">_cache_files</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">blob</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">channel_id</span><span class="p">,</span> <span class="n">attachment_id</span><span class="p">,</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">ATTACHMENT_URL_RE</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">blob</span><span class="p">):</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="n">channel_id</span><span class="p">,</span> <span class="n">attachment_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="p">{</span>
+                <span class="s2">"channel_id"</span><span class="p">:</span> <span class="n">channel_id</span><span class="o">.</span><span class="n">decode</span><span class="p">(),</span>
+                <span class="s2">"attachment_id"</span><span class="p">:</span> <span class="n">attachment_id</span><span class="o">.</span><span class="n">decode</span><span class="p">(),</span>
+                <span class="s2">"filename"</span><span class="p">:</span> <span class="n">filename</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="s2">"replace"</span><span class="p">),</span>
+                <span class="s2">"cache_file"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+            <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="cached_channel_ids">
+<a class="viewcode-back" href="../../module_docs/discorddol/local_cache.html#discorddol.cached_channel_ids">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cached_channel_ids</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">cache_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Counter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Channel ids appearing in cached attachment URLs, counted by cached attachment.</span>
+
+<span class="sd">    The counts are a usefully blunt signal: a channel with many cached attachments was</span>
+<span class="sd">    one you actually spent time in.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">Counter</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"channel_id"</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">cached_attachment_refs</span><span class="p">(</span><span class="n">cache_dir</span><span class="o">=</span><span class="n">cache_dir</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="orphan_channel_ids">
+<a class="viewcode-back" href="../../module_docs/discorddol/local_cache.html#discorddol.orphan_channel_ids">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">orphan_channel_ids</span><span class="p">(</span>
+    <span class="n">guild_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">cache_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Cached channel ids that no longer exist in ``guild_id`` -- deleted channels.</span>
+
+<span class="sd">    Returns ``{'orphans': {channel_id: count}, 'live': {channel_id: count}}``, each</span>
+<span class="sd">    ordered by count descending.</span>
+
+<span class="sd">    An id under ``orphans`` is a *candidate*, not a verdict: it is a channel this</span>
+<span class="sd">    machine cached attachments from that is not currently visible in ``guild_id``. That</span>
+<span class="sd">    covers deleted channels, but also channels in other servers and channels the bot</span>
+<span class="sd">    lacks permission to see. Cross-check a candidate against</span>
+<span class="sd">    :func:`extract_channel_attachments` output before concluding anything.</span>
+
+<span class="sd">    &gt;&gt;&gt; import tempfile</span>
+<span class="sd">    &gt;&gt;&gt; from discorddol.base import DictBackend</span>
+<span class="sd">    &gt;&gt;&gt; backend = DictBackend(channels={'1': [{'id': '10', 'name': 'dev'}]})</span>
+<span class="sd">    &gt;&gt;&gt; with tempfile.TemporaryDirectory() as tmp:</span>
+<span class="sd">    ...     result = orphan_channel_ids('1', backend=backend, cache_dir=tmp)</span>
+<span class="sd">    &gt;&gt;&gt; sorted(result)</span>
+<span class="sd">    ['live', 'orphans']</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">_dflt_backend</span>
+
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">_dflt_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span>
+    <span class="n">live</span> <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">backend</span><span class="o">.</span><span class="n">channels</span><span class="p">(</span><span class="n">guild_id</span><span class="p">)}</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">cached_channel_ids</span><span class="p">(</span><span class="n">cache_dir</span><span class="o">=</span><span class="n">cache_dir</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">ordered</span><span class="p">(</span><span class="n">predicate</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="nb">sorted</span><span class="p">(</span>
+                <span class="p">((</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">counts</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">predicate</span><span class="p">(</span><span class="n">k</span><span class="p">)),</span>
+                <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">kv</span><span class="p">:</span> <span class="o">-</span><span class="n">kv</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"orphans"</span><span class="p">:</span> <span class="n">ordered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">live</span><span class="p">),</span>
+        <span class="s2">"live"</span><span class="p">:</span> <span class="n">ordered</span><span class="p">(</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">live</span><span class="p">),</span>
+    <span class="p">}</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_extract_payload</span><span class="p">(</span>
+    <span class="n">blob</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">start_hint</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Best-effort slice of a cache entry's body: from a known file magic to the EOF record."""</span>
+    <span class="n">best</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">magic</span><span class="p">,</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">FILE_MAGICS</span><span class="p">:</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">blob</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">magic</span><span class="p">,</span> <span class="n">start_hint</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">index</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span> <span class="ow">and</span> <span class="p">(</span><span class="n">best</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="n">best</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">best</span> <span class="o">=</span> <span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">ext</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">best</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">start</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">best</span>
+    <span class="n">end</span> <span class="o">=</span> <span class="n">blob</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">SIMPLE_CACHE_EOF_MAGIC</span><span class="p">,</span> <span class="n">start</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">blob</span><span class="p">[</span><span class="n">start</span> <span class="p">:</span> <span class="n">end</span> <span class="k">if</span> <span class="n">end</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">blob</span><span class="p">)],</span> <span class="n">ext</span>
+
+
+<div class="viewcode-block" id="extract_channel_attachments">
+<a class="viewcode-back" href="../../module_docs/discorddol/local_cache.html#discorddol.extract_channel_attachments">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_channel_attachments</span><span class="p">(</span>
+    <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">out_dir</span><span class="p">,</span>
+    <span class="n">cache_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Write every cached attachment belonging to ``channel_id`` out to ``out_dir``.</span>
+
+<span class="sd">    Returns one record per file written, with the original filename and the bytes</span>
+<span class="sd">    recovered. Extraction is heuristic -- it locates a known file signature inside the</span>
+<span class="sd">    cache entry and reads to the entry's EOF record -- so verify anything that matters</span>
+<span class="sd">    by opening it.</span>
+<span class="sd">    """</span>
+    <span class="n">out_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span>
+    <span class="n">out_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">written</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">ref</span> <span class="ow">in</span> <span class="n">cached_attachment_refs</span><span class="p">(</span><span class="n">cache_dir</span><span class="o">=</span><span class="n">cache_dir</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref</span><span class="p">[</span><span class="s2">"channel_id"</span><span class="p">]</span> <span class="o">!=</span> <span class="nb">str</span><span class="p">(</span><span class="n">channel_id</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">blob</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">ref</span><span class="p">[</span><span class="s2">"cache_file"</span><span class="p">])</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">extracted</span> <span class="o">=</span> <span class="n">_extract_payload</span><span class="p">(</span><span class="n">blob</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">extracted</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">payload</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">extracted</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">ref</span><span class="p">[</span><span class="s2">"filename"</span><span class="p">]</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ref</span><span class="p">[</span><span class="s1">'attachment_id'</span><span class="p">]</span><span class="si">}{</span><span class="n">ext</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">Path</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">suffix</span><span class="p">:</span>
+            <span class="n">name</span> <span class="o">+=</span> <span class="n">ext</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">out_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ref</span><span class="p">[</span><span class="s1">'attachment_id'</span><span class="p">]</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">target</span><span class="o">.</span><span class="n">write_bytes</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+        <span class="n">written</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">target</span><span class="p">),</span>
+                <span class="s2">"filename"</span><span class="p">:</span> <span class="n">ref</span><span class="p">[</span><span class="s2">"filename"</span><span class="p">],</span>
+                <span class="s2">"bytes"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">payload</span><span class="p">),</span>
+                <span class="s2">"attachment_id"</span><span class="p">:</span> <span class="n">ref</span><span class="p">[</span><span class="s2">"attachment_id"</span><span class="p">],</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">written</span></div>
+
+
+
+<div class="viewcode-block" id="CachedAttachments">
+<a class="viewcode-back" href="../../module_docs/discorddol/local_cache.html#discorddol.CachedAttachments">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CachedAttachments</span><span class="p">(</span><span class="n">Mapping</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Mapping: channel id -&gt; list of cached attachment records on this machine.</span>
+
+<span class="sd">    A read-only view of what the local Discord client still holds, usable after the</span>
+<span class="sd">    channel itself is gone.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cache_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span> <span class="o">=</span> <span class="n">cache_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_by_channel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_scan</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_by_channel</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">grouped</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">ref</span> <span class="ow">in</span> <span class="n">cached_attachment_refs</span><span class="p">(</span><span class="n">cache_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span><span class="p">):</span>
+                <span class="n">grouped</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">ref</span><span class="p">[</span><span class="s2">"channel_id"</span><span class="p">],</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_by_channel</span> <span class="o">=</span> <span class="n">grouped</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_by_channel</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scan</span><span class="p">()[</span><span class="nb">str</span><span class="p">(</span><span class="n">channel_id</span><span class="p">)]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scan</span><span class="p">())</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scan</span><span class="p">())</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

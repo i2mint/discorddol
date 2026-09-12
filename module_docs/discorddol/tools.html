@@ -1,0 +1,194 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>discorddol.tools &mdash; discorddol 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/toggleprompt.js?v=d7ede5d2"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="prev" title="discorddol.tests.test_smoke" href="tests/test_smoke.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            discorddol
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../discorddol.html">discorddol</a></li>
+<li class="toctree-l1"><a class="reference internal" href="__main__.html">discorddol.__main__</a></li>
+<li class="toctree-l1"><a class="reference internal" href="base.html">discorddol.base</a></li>
+<li class="toctree-l1"><a class="reference internal" href="local_cache.html">discorddol.local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tests/test_local_cache.html">discorddol.tests.test_local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tests/test_smoke.html">discorddol.tests.test_smoke</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">discorddol.tools</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.DISPATCH_FUNCS"><code class="docutils literal notranslate"><span class="pre">DISPATCH_FUNCS</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.channels"><code class="docutils literal notranslate"><span class="pre">channels()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.export_channel"><code class="docutils literal notranslate"><span class="pre">export_channel()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.find_deleted_channels"><code class="docutils literal notranslate"><span class="pre">find_deleted_channels()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.guilds"><code class="docutils literal notranslate"><span class="pre">guilds()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.messages"><code class="docutils literal notranslate"><span class="pre">messages()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.post_message"><code class="docutils literal notranslate"><span class="pre">post_message()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.recover_attachments"><code class="docutils literal notranslate"><span class="pre">recover_attachments()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.transcript"><code class="docutils literal notranslate"><span class="pre">transcript()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">discorddol</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">discorddol.tools</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/module_docs/discorddol/tools.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-discorddol.tools">
+<span id="discorddol-tools"></span><h1>discorddol.tools<a class="headerlink" href="#module-discorddol.tools" title="Link to this heading"></a></h1>
+<p>SSOT verb list for discorddol: plain functions, JSON-able in, JSON-able out.</p>
+<p>Deliberately agnostic about how it is reached. This module knows nothing about MCP,
+HTTP, argparse or any agent host; a wrapper references e.g. <code class="docutils literal notranslate"><span class="pre">discorddol.tools:messages</span></code>
+and gets a clean JSON-ready value back. <code class="docutils literal notranslate"><span class="pre">__main__.py</span></code> builds the CLI off the same list
+(<code class="docutils literal notranslate"><span class="pre">DISPATCH_FUNCS</span></code>), so a new verb becomes available on every surface at once.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="discorddol.tools.DISPATCH_FUNCS">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">DISPATCH_FUNCS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[&lt;function</span> <span class="pre">guilds&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">channels&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">messages&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">transcript&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">export_channel&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">find_deleted_channels&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">recover_attachments&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">post_message&gt;]</span></span><a class="headerlink" href="#discorddol.tools.DISPATCH_FUNCS" title="Link to this definition"></a></dt>
+<dd><p>The SSOT list every surface dispatches over. Add a verb here, get it everywhere.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.channels">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">channels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">guild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names_only</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#channels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.channels" title="Link to this definition"></a></dt>
+<dd><p>List a server’s channels and threads. <code class="docutils literal notranslate"><span class="pre">guild</span></code> may be a guild name or id.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.export_channel">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">export_channel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">guild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'~/Downloads/discord'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#export_channel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.export_channel" title="Link to this definition"></a></dt>
+<dd><p>Export a channel (threads included by default) to a JSON file. Returns a summary.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.find_deleted_channels">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">find_deleted_channels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">guild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#find_deleted_channels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.find_deleted_channels" title="Link to this definition"></a></dt>
+<dd><p>Find channel ids cached on this machine that no longer exist in a server.</p>
+<p>Discord cannot undelete a channel, but the desktop client cached its attachments.
+This is how you find the id of a deleted channel, so you can recover those
+attachments with recover-attachments and locate the channel in a data export.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.guilds">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">guilds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#guilds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.guilds" title="Link to this definition"></a></dt>
+<dd><p>List the Discord servers the bot has been added to.</p>
+<p>Run this first: if it returns an empty list, the bot exists but has not been invited
+to any server yet.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.messages">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">messages</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">guild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#messages"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.messages" title="Link to this definition"></a></dt>
+<dd><p>Fetch a channel’s messages as dicts. <code class="docutils literal notranslate"><span class="pre">limit=None</span></code> fetches the whole history.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.post_message">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">post_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#post_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.post_message" title="Link to this definition"></a></dt>
+<dd><p>Post a message to a channel. Requires the bot to have Send Messages.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.recover_attachments">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">recover_attachments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'~/Downloads/discord_recovered'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#recover_attachments"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.recover_attachments" title="Link to this definition"></a></dt>
+<dd><p>Write out every attachment this machine cached for a channel, deleted or not.</p>
+<p>Needs no token and no network: the bytes come from the local Discord client cache.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.transcript">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">transcript</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">guild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#transcript"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.transcript" title="Link to this definition"></a></dt>
+<dd><p>Render a channel as readable transcript text – the form to feed an LLM.</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="tests/test_smoke.html" class="btn btn-neutral float-left" title="discorddol.tests.test_smoke" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
