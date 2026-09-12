@@ -26,13 +26,7 @@
 # action uses peaceiris/actions-gh-pages (branch-based) + REST API,
 # not the OIDC `actions/deploy-pages` flow.
 name: Continuous Integration
-# workflow_dispatch is added on top of the wads stub: without it a run that ends
-# up in a non-rerunnable state (e.g. the action_required a brand-new repo can get
-# on its very first run) cannot be retriggered from the API or the UI at all.
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
+on: [push, pull_request]
 jobs:
   ci:
     uses: i2mint/wads/.github/workflows/uv-ci.yml@master
@@ -46,8 +40,8 @@ jobs:
     # at parse time. The default JSON transport has no such limit;
     # regenerate with `wads-migrate ci-to-stub` to switch.
     #
-    # Do not switch back: GitHub holds every run (action_required, zero
-    # jobs) of a stub that hands the whole secrets context to a workflow
-    # in another repository. See i2mint/wads#74.
+    # Keep the named transport here: while this stub passed the whole secrets
+    # context, GitHub held every run of this repository's CI (action_required,
+    # zero jobs). See i2mint/wads#74.
     secrets:
       PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
