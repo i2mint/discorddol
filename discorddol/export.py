@@ -18,15 +18,19 @@ Categories, voice and stage channels are not exported, and neither is a channel 
 history Discord refuses to hand over. Each is listed under ``skipped`` with its reason.
 
 **Incremental and resumable.** A channel's file is its own cursor: a run reads the id on
-the file's last line and fetches only messages after it, a page at a time, appending as
-it goes. An interrupted run loses at most the page it was writing; a half-written last
-line is dropped by the next run, which carries on from there. A channel whose
-``last_message_id`` is already in its file is not fetched at all.
+the file's last complete line and fetches only messages after it, a page at a time,
+appending as it goes. An interrupted run loses at most the page it was writing; the next
+run drops a half-written last line before appending, and carries on from there. A
+channel whose ``last_message_id`` is already in its file is not fetched at all. Only one
+run at a time may write to a folder; another is refused with :class:`ExportInProgress`.
 
-**Preflight.** Without the Message Content intent, Discord still returns every message,
-but with its text, attachments and embeds blanked. An export in that state looks like a
-success and holds nothing, so :func:`check_message_content` fetches one message before
-anything is written, and refuses to go on if it is blank.
+**Content check.** Without the Message Content intent, Discord still returns every
+message, but with its text, attachments and embeds blanked. An export in that state
+looks like a success and holds nothing, so before anything is written,
+:func:`check_message_content` samples recent messages written by people and refuses to
+go on when most of them are blank. If it finds nothing to judge, the export judges the
+messages it fetches the same way as it goes, and stops as soon as the sample is big
+enough to show they are blank.
 """
 
 from __future__ import annotations
@@ -34,16 +38,18 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Mapping
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, Optional
 
-from .base import NO_HISTORY_KINDS, Backend, _dflt_backend, channel_kind
+from .base import NO_HISTORY_KINDS, Backend, NotFound, _dflt_backend, channel_kind
 
 __all__ = [
     "export_guild",
     "check_message_content",
     "MessageContentMissing",
+    "ExportInProgress",
     "ChannelLogs",
     "default_export_dir",
 ]
@@ -51,6 +57,7 @@ __all__ = [
 MANIFEST_VERSION = 1
 MANIFEST_FILENAME = "manifest.json"
 MESSAGES_DIRNAME = "messages"
+LOCK_FILENAME = ".export.lock"
 DFLT_PAGE_SIZE = 1000
 APP_NAME = "discorddol"
 DATA_DIR_ENVVAR = "DISCORDDOL_DATA_DIR"
@@ -67,6 +74,10 @@ SKIP_REASONS = {
 }
 #: Message types a person writes. A system notice (a pin, a join) can be blank anyway.
 REGULAR_MESSAGE_TYPES = frozenset({"default", "reply"})
+#: How many messages written by people the content check judges.
+CONTENT_SAMPLE_SIZE = 20
+#: The share of blank messages in that sample above which content counts as missing.
+MAX_BLANK_SHARE = 0.5
 
 
 def default_export_dir(guild_id) -> Path:
@@ -87,7 +98,7 @@ def default_export_dir(guild_id) -> Path:
 
 
 # --------------------------------------------------------------------------------------
-# Preflight
+# The content check
 # --------------------------------------------------------------------------------------
 
 
@@ -95,61 +106,85 @@ class MessageContentMissing(RuntimeError):
     """Message bodies come back blank: the bot's Message Content Intent is off."""
 
 
-def check_message_content(backend: Backend, channels: Iterable[dict]) -> dict:
-    """Refuse to export blank messages: fetch one message and check it has content.
+class ExportInProgress(RuntimeError):
+    """Another export is already writing to the same folder."""
 
-    Goes through ``channels`` (records with an ``id``) in order, fetching each one's
-    newest message, until it finds a regular one: written by someone, rather than a
-    system notice such as a pin, which may be blank anyway. If that message has no
-    text, no attachments and no embeds, raises :class:`MessageContentMissing`, which
-    names the fix. Discord blanks all three when the intent is off, so checking all
-    three lets an image-only message pass, as it should.
 
-    Returns what was checked: ``{'status': 'passed', 'channel_id', 'message_id'}``, or
-    ``{'status': 'inconclusive', 'reason'}`` when no channel had a message to check.
+def check_message_content(
+    backend: Backend,
+    channels: Iterable[dict],
+    *,
+    sample_size: int = CONTENT_SAMPLE_SIZE,
+    max_blank_share: float = MAX_BLANK_SHARE,
+) -> dict:
+    """Refuse to export blank messages: sample recent messages and check their content.
+
+    Fetches the newest messages of each channel in ``channels`` (records with an
+    ``id``), one call per channel, until ``sample_size`` messages written by people have
+    been seen. System notices and bot messages do not count: a notice can be blank
+    anyway, and a bot's own messages keep their content without the intent. A message
+    is blank when it has no text, no attachments and no embeds, which is how Discord
+    sends every message when the intent is off.
+
+    Raises :class:`MessageContentMissing`, naming the fix, when more than
+    ``max_blank_share`` of the sample is blank; a few blank messages (a sticker, a poll)
+    do not trip it. Returns ``{'status': 'passed', 'checked', 'blank'}``, or
+    ``{'status': 'inconclusive', 'checked': 0, 'blank': 0}`` when there was nothing to
+    judge.
 
     >>> from discorddol.base import DictBackend
     >>> backend = DictBackend(messages={'10': [{'id': '1', 'content': 'hi'}]})
-    >>> check_message_content(backend, [{'id': '10'}])['status']
-    'passed'
+    >>> check_message_content(backend, [{'id': '10'}])
+    {'status': 'passed', 'checked': 1, 'blank': 0}
     """
-
-    def is_regular(message):
-        kind = str(message.get("type") or "default").rsplit(".", 1)[-1]
-        return kind in REGULAR_MESSAGE_TYPES
-
+    sample = []
     for record in channels:
+        if len(sample) >= sample_size:
+            break
         try:
-            newest = backend.messages(record["id"], limit=1, oldest_first=False)
-        except (PermissionError, LookupError):
+            recent = backend.messages(
+                record["id"], limit=sample_size, oldest_first=False
+            )
+        except (PermissionError, NotFound):
             continue
-        if not newest or not is_regular(newest[0]):
-            continue
-        message = newest[0]
-        if (
-            message.get("content")
-            or message.get("attachments")
-            or message.get("embeds")
-        ):
-            return {
-                "status": "passed",
-                "channel_id": record["id"],
-                "message_id": message.get("id"),
-            }
+        sample.extend((record, message) for message in recent if _is_telling(message))
+    return _judge_content(sample[:sample_size], max_blank_share=max_blank_share)
+
+
+def _judge_content(sample: list, *, max_blank_share: float) -> dict:
+    """The verdict on ``(channel record, message)`` pairs; raises when most are blank."""
+    if not sample:
+        return {"status": "inconclusive", "checked": 0, "blank": 0}
+    blank = [(record, message) for record, message in sample if _is_blank(message)]
+    if len(blank) > max_blank_share * len(sample):
+        record, message = blank[0]
         raise MessageContentMissing(
-            f"Message {message.get('id')} in #{_name(record)} came back with no text, "
-            f"attachments or embeds. That is what Discord sends when the bot's "
+            f"{len(blank)} of {len(sample)} messages written by people came back with "
+            f"no text, attachments or embeds (message {message.get('id')} in "
+            f"#{_name(record)}, for one). That is what Discord sends when the bot's "
             f'"Message Content Intent" is off, and the export would hold nothing.\n'
             f"Fix: https://discord.com/developers/applications -> your app -> Bot -> "
-            f'Privileged Gateway Intents -> enable "Message Content Intent", then '
-            f"re-run.\n"
-            f"If that message really is blank, re-run with preflight=False "
+            f'Privileged Gateway Intents -> enable "Message Content Intent", then run '
+            f"the export again. Anything already exported without the intent is blank "
+            f"and will not be fetched again, so delete it first.\n"
+            f"If these messages really are blank, run with preflight=False "
             f"(CLI: --skip-preflight)."
         )
-    return {
-        "status": "inconclusive",
-        "reason": "no readable channel had a message to check",
-    }
+    return {"status": "passed", "checked": len(sample), "blank": len(blank)}
+
+
+def _is_telling(message: dict) -> bool:
+    """Whether a blank body would say something: written by a person, not a notice."""
+    kind = str(message.get("type") or "default").rsplit(".", 1)[-1]
+    return kind in REGULAR_MESSAGE_TYPES and not (message.get("author") or {}).get(
+        "bot"
+    )
+
+
+def _is_blank(message: dict) -> bool:
+    return not (
+        message.get("content") or message.get("attachments") or message.get("embeds")
+    )
 
 
 # --------------------------------------------------------------------------------------
@@ -163,6 +198,8 @@ class ChannelLogs(Mapping):
     The export's writer as well as its reader: :meth:`extend` appends messages, and
     :meth:`summary` gives a file's message count, date range and cursor, parsing only
     its first and last lines. Files hold messages oldest first, in the order appended.
+    Reading never changes a file; a half-written last line is ignored until the next
+    :meth:`extend` drops it.
 
     >>> import tempfile
     >>> with tempfile.TemporaryDirectory() as tmp:
@@ -210,14 +247,15 @@ class ChannelLogs(Mapping):
     def summary(self, channel_id) -> dict:
         """A channel's message count, first and last dates, and last id (its cursor)."""
         path = self.path(channel_id)
-        if not path.is_file():
-            return _empty_summary()
-        _drop_partial_last_line(path)
         count, first, last = 0, None, None
-        with path.open("rb") as file:
-            for last in file:
-                count += 1
-                first = first or last
+        if path.is_file():
+            with path.open("rb") as file:
+                for line in file:
+                    if not line.endswith(b"\n"):
+                        break  # an interrupted append
+                    count += 1
+                    first = first or line
+                    last = line
         if not count:
             return _empty_summary()
         head, tail = json.loads(first), json.loads(last)
@@ -244,15 +282,16 @@ def export_guild(
     page_size: int = DFLT_PAGE_SIZE,
     private_threads: bool = True,
     preflight: bool = True,
+    sample_size: int = CONTENT_SAMPLE_SIZE,
     log: Optional[Callable[[str], None]] = None,
 ) -> dict:
     """Export every channel of a guild the bot can read into ``out_dir``.
 
     Returns the manifest, which is also written to ``out_dir``. Re-running on the same
     ``out_dir`` fetches only what is new (see the module docstring).
-    ``private_threads=False`` does not ask for private archived threads, and
-    ``preflight=False`` skips :func:`check_message_content`. ``log`` gets one line per
-    channel.
+    ``private_threads=False`` does not ask for private archived threads.
+    ``preflight=False`` skips the content check; ``sample_size`` is how many messages
+    it judges. ``log`` gets one line per channel.
 
     >>> import tempfile
     >>> from discorddol.base import DictBackend
@@ -271,52 +310,74 @@ def export_guild(
     [('Community', 'category: it groups other channels and holds no messages')]
     """
     backend = _dflt_backend(backend, token)
+    out_dir = Path(out_dir).expanduser()
     parents, threads_by_parent, skipped = _plan(backend.channels(guild_id))
     if preflight:
         own_history = [p for p in parents if channel_kind(p) not in NO_HISTORY_KINDS]
         active_threads = [t for group in threads_by_parent.values() for t in group]
-        checked = check_message_content(backend, own_history + active_threads)
+        checked = check_message_content(
+            backend, own_history + active_threads, sample_size=sample_size
+        )
     else:
         checked = {"status": "skipped"}
-    run = _ExportRun(
-        backend,
-        Path(out_dir).expanduser(),
-        guild={"id": str(guild_id), "name": guild_name},
-        preflight=checked,
-        skipped=skipped,
-        page_size=page_size,
-        log=log or (lambda line: None),
-    )
-    for parent in parents:
-        run.export_with_threads(
-            parent,
-            active_threads=threads_by_parent.pop(parent["id"], []),
-            private_threads=(
-                private_threads and channel_kind(parent) in PRIVATE_THREAD_PARENT_KINDS
-            ),
+    with _exclusive(out_dir):
+        run = _ExportRun(
+            backend,
+            out_dir,
+            guild={"id": str(guild_id), "name": guild_name},
+            preflight=checked,
+            skipped=skipped,
+            page_size=page_size,
+            sample_size=sample_size,
+            log=log or (lambda line: None),
         )
-    for orphans in threads_by_parent.values():  # active threads with no listed parent
-        for thread in orphans:
-            run.export(thread)
-    return run.finish()
+        for parent in parents:
+            run.export_with_threads(
+                parent,
+                active_threads=threads_by_parent.pop(parent["id"], []),
+                private_threads=(
+                    private_threads
+                    and channel_kind(parent) in PRIVATE_THREAD_PARENT_KINDS
+                ),
+            )
+        for orphans in threads_by_parent.values():  # active threads, no listed parent
+            for thread in orphans:
+                run.export(thread)
+        return run.finish()
 
 
 class _ExportRun:
     """One run of :func:`export_guild`: appends messages and keeps the manifest current.
 
-    Channel entries from an earlier run's manifest are kept and updated, so a run that
-    stops early still leaves every channel exported so far described. ``skipped`` and
-    ``not_fetched`` describe this run only.
+    Entries from an earlier run's manifest are kept, so a run that stops early still
+    describes every channel exported so far. An entry's ``status`` says what the latest
+    run did with it: ``exported``; ``skipped``, when Discord refused its history this
+    time (``skipped`` says why); or, once a run finishes without reaching it,
+    ``not in last run``, as for a channel deleted or hidden from the bot since.
+    ``skipped`` and ``not_fetched`` describe the latest run only.
     """
 
     def __init__(
-        self, backend, out_dir: Path, *, guild, preflight, skipped, page_size, log
+        self,
+        backend,
+        out_dir: Path,
+        *,
+        guild,
+        preflight,
+        skipped,
+        page_size,
+        sample_size,
+        log,
     ):
         self.backend = backend
         self.logs = ChannelLogs(out_dir / MESSAGES_DIRNAME)
         self.manifest_path = out_dir / MANIFEST_FILENAME
         self.page_size = page_size
+        self.sample_size = sample_size
         self.log = log
+        self.seen = set()
+        #: While no content check has passed: the messages fetched so far, to judge.
+        self.unjudged = [] if preflight["status"] == "inconclusive" else None
         previous = _read_json(self.manifest_path)
         self.entries = {entry["id"]: entry for entry in previous.get("channels", ())}
         earlier_name = previous.get("guild", {}).get("name")
@@ -343,7 +404,8 @@ class _ExportRun:
     ) -> None:
         """Export a channel, then every thread under it, then save the manifest."""
         if channel_kind(parent) in NO_HISTORY_KINDS:
-            self._set_entry(parent, file=None)  # its messages are in its posts
+            self.seen.add(parent["id"])  # its messages are in its posts
+            self._set_entry(parent, status="exported")
         else:
             self.export(parent)
         threads = self._threads_of(parent, active_threads, private=private_threads)
@@ -356,27 +418,42 @@ class _ExportRun:
     def export(self, record: dict, *, parent: Optional[dict] = None) -> None:
         """Append a channel's new messages to its file and update its manifest entry."""
         channel_id = record["id"]
-        try:
-            added = self._fetch_new_messages(channel_id, record.get("last_message_id"))
-        except (PermissionError, LookupError) as error:
-            reason = f"its messages could not be read: {error}"
+        self.seen.add(channel_id)
+        before = self.logs.summary(channel_id)
+        summary, refusal = self._fetch_new_messages(record, before)
+        added = summary["message_count"] - before["message_count"]
+        self.manifest["run"]["new_messages"] += added
+        if refusal is not None:
+            reason = f"its messages could not be read: {refusal}"
             self.manifest["skipped"].append(_skipped(record, reason))
-            self.log(f"skipped #{_name(record)} ({channel_kind(record)}): {error}")
+            self.log(f"skipped #{_name(record)} ({channel_kind(record)}): {refusal}")
+            if channel_id in self.logs:  # an earlier page or run wrote some
+                self._set_entry(
+                    record, status="skipped", summary=summary, parent=parent
+                )
             return
         if channel_id not in self.logs:
             self.logs.extend(channel_id, ())  # every exported channel gets a file
         entry = self._set_entry(
-            record, parent=parent, file=f"{MESSAGES_DIRNAME}/{channel_id}.jsonl"
+            record, status="exported", summary=summary, parent=parent
         )
         self.manifest["run"]["channels_exported"] += 1
-        self.manifest["run"]["new_messages"] += added
         self.log(
             f"#{_name(record)} ({entry['kind']}): "
             f"{added} new, {entry['message_count']} in all"
         )
 
     def finish(self) -> dict:
-        """Stamp the run as finished, save the manifest and return it."""
+        """Mark what this run did not reach, stamp it finished, save and return it."""
+        for channel_id, entry in self.entries.items():
+            if channel_id not in self.seen:
+                entry["status"] = "not in last run"
+        if self.unjudged:
+            self.manifest["run"]["preflight"] = {
+                "status": "inconclusive",
+                "checked": len(self.unjudged),
+                "blank": sum(_is_blank(message) for _, message in self.unjudged),
+            }
         self.manifest["run"]["finished_at"] = _now()
         self.save()
         return self.manifest
@@ -386,26 +463,44 @@ class _ExportRun:
         self.manifest["channels"] = list(self.entries.values())
         _write_json(self.manifest_path, self.manifest)
 
-    def _fetch_new_messages(self, channel_id: str, last_message_id) -> int:
-        """Page through the messages newer than the file's last line, appending each page."""
-        cursor = self.logs.summary(channel_id)["last_message_id"]
-        if cursor is not None and last_message_id is not None:
-            if int(last_message_id) <= int(cursor):
-                return 0  # Discord's newest message is already in the file
-        added = 0
+    def _fetch_new_messages(self, record: dict, summary: dict) -> tuple:
+        """Page through messages newer than the file's last line, appending each page.
+
+        Returns the file's summary afterwards, and Discord's refusal if one stopped the
+        paging. Only the backend call is guarded, so a local file error still raises.
+        """
+        channel_id, cursor = record["id"], summary["last_message_id"]
+        latest = record.get("last_message_id")
+        if cursor is not None and latest is not None and int(latest) <= int(cursor):
+            return summary, None  # Discord's newest message is already in the file
         while True:
-            page = self.backend.messages(
-                channel_id, limit=self.page_size, after=cursor, oldest_first=True
-            )
+            try:
+                page = self.backend.messages(
+                    channel_id, limit=self.page_size, after=cursor, oldest_first=True
+                )
+            except (PermissionError, NotFound) as refusal:
+                return summary, refusal
             fresh = sorted(
                 (m for m in page if cursor is None or int(m["id"]) > int(cursor)),
                 key=_snowflake,
             )
             if fresh:
-                added += self.logs.extend(channel_id, fresh)
-                cursor = fresh[-1]["id"]
+                self._judge(record, fresh)
+                self.logs.extend(channel_id, fresh)
+                summary = _extended(summary, fresh)
+                cursor = summary["last_message_id"]
             if not fresh or len(page) < self.page_size:
-                return added
+                return summary, None
+
+    def _judge(self, record: dict, page: list) -> None:
+        """Until a content check has passed, judge fetched messages before writing them."""
+        if self.unjudged is None:
+            return
+        self.unjudged.extend((record, m) for m in page if _is_telling(m))
+        if len(self.unjudged) >= self.sample_size:
+            verdict = _judge_content(self.unjudged, max_blank_share=MAX_BLANK_SHARE)
+            self.manifest["run"]["preflight"] = {**verdict, "during": "export"}
+            self.unjudged = None
 
     def _threads_of(self, parent: dict, active_threads, *, private: bool) -> list:
         """A channel's threads: its active ones, plus public and private archived ones."""
@@ -418,7 +513,7 @@ class _ExportRun:
                 archived = self.backend.archived_threads(
                     parent["id"], private=is_private
                 )
-            except (PermissionError, LookupError) as error:
+            except (PermissionError, NotFound) as error:
                 self.manifest["not_fetched"].append(
                     {
                         "channel_id": parent["id"],
@@ -434,22 +529,32 @@ class _ExportRun:
         return sorted(found.values(), key=_snowflake)
 
     def _set_entry(
-        self, record: dict, *, file: Optional[str], parent: Optional[dict] = None
+        self,
+        record: dict,
+        *,
+        status: str,
+        summary: Optional[dict] = None,
+        parent: Optional[dict] = None,
     ) -> dict:
-        """Describe a channel in the manifest, from its record and its file."""
+        """Describe a channel in the manifest: what it is, and what its file holds.
+
+        ``channel`` keeps the backend's full record, so an export can be read back as
+        a channel listing.
+        """
+        channel_id = record["id"]
         entry = {
-            "id": record["id"],
+            "id": channel_id,
             "name": record.get("name"),
             "kind": channel_kind(record),
-            "type": record.get("type"),
             "parent_id": record.get("parent_id"),
             "parent_name": parent.get("name") if parent else None,
-            "archived": record.get("archived"),
-            "file": file,
-            **(self.logs.summary(record["id"]) if file else _empty_summary()),
+            "status": status,
+            "file": f"{MESSAGES_DIRNAME}/{channel_id}.jsonl" if summary else None,
+            **(summary or _empty_summary()),
             "exported_at": _now(),
+            "channel": record,
         }
-        self.entries[record["id"]] = entry
+        self.entries[channel_id] = entry
         return entry
 
 
@@ -468,11 +573,61 @@ def _plan(listing: Iterable[dict]) -> tuple[list, dict, list]:
     return parents, threads_by_parent, skipped
 
 
+@contextmanager
+def _exclusive(folder: Path):
+    """Hold an OS lock on ``folder`` for one run. The OS releases it if the run dies."""
+    folder.mkdir(parents=True, exist_ok=True)
+    handle = (folder / LOCK_FILENAME).open("a+b")
+    if os.name == "nt":
+        import msvcrt
+
+        def lock(mode=msvcrt.LK_NBLCK):
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), mode, 1)
+
+        def unlock():
+            lock(msvcrt.LK_UNLCK)
+
+    else:
+        import fcntl
+
+        def lock():
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        def unlock():
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    try:
+        lock()
+    except OSError as error:
+        handle.close()
+        raise ExportInProgress(
+            f"Another export is already writing to {folder}. Let it finish, or stop "
+            f"it, then run this one again."
+        ) from error
+    try:
+        yield
+    finally:
+        unlock()
+        handle.close()
+
+
+def _extended(summary: dict, fresh: list) -> dict:
+    """A file's summary after appending ``fresh``, oldest first, to it."""
+    return {
+        "message_count": summary["message_count"] + len(fresh),
+        "first_message_at": summary["first_message_at"] or fresh[0].get("created_at"),
+        "last_message_at": fresh[-1].get("created_at"),
+        "last_message_id": fresh[-1]["id"],
+    }
+
+
 def _skipped(record: dict, reason: str) -> dict:
     return {
         "id": record["id"],
         "name": record.get("name"),
         "kind": channel_kind(record),
+        "type": record.get("type"),
         "reason": reason,
     }
 

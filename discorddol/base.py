@@ -27,6 +27,7 @@ promptly, instead of a bot process you have to keep alive and shut down.
 from __future__ import annotations
 
 import asyncio
+import operator
 import os
 from collections.abc import Mapping
 from datetime import datetime
@@ -132,11 +133,18 @@ def message_to_dict(message) -> dict:
 def channel_to_dict(channel) -> dict:
     """Serialize a channel or thread to a plain dict."""
     guild = getattr(channel, "guild", None)
+    is_thread = type(channel).__name__ == "Thread"
     return {
         "id": str(channel.id),
         "name": getattr(channel, "name", None),
         "type": str(getattr(channel, "type", type(channel).__name__)),
-        "category": getattr(getattr(channel, "category", None), "name", None),
+        # A thread's category is its parent's, which discord.py looks up in a cache
+        # that REST-only mode never fills, and it raises rather than return None.
+        "category": (
+            None
+            if is_thread
+            else getattr(getattr(channel, "category", None), "name", None)
+        ),
         "topic": getattr(channel, "topic", None),
         "created_at": (
             channel.created_at.isoformat()
@@ -148,7 +156,7 @@ def channel_to_dict(channel) -> dict:
         "parent_id": str(channel.parent_id)
         if getattr(channel, "parent_id", None)
         else None,
-        "is_thread": type(channel).__name__ == "Thread",
+        "is_thread": is_thread,
         "archived": getattr(channel, "archived", None),
         "last_message_id": (
             str(channel.last_message_id)
@@ -210,9 +218,10 @@ class NotFound(LookupError):
 class Backend(Protocol):
     """What a discorddol backend must provide. Five methods, all returning plain dicts.
 
-    ``channels`` lists a guild's channels together with its active threads. A refusal
-    is raised as a :class:`PermissionError` (see :class:`Forbidden`), so code above the
-    backend can handle it without knowing which backend it has.
+    ``channels`` lists a guild's channels together with its active threads. A backend
+    raises a :class:`PermissionError` (such as :class:`Forbidden`) when it is refused
+    and :class:`NotFound` when the object is gone, so code above the backend can handle
+    both without knowing which backend it has.
     """
 
     def guilds(self) -> list[dict]: ...
@@ -461,14 +470,16 @@ class DictBackend:
         channel_id: str,
         *,
         limit: Optional[int] = None,
-        after: Optional[Union[str, int]] = None,
-        before: Optional[Union[str, int]] = None,
+        after: Optional[Union[datetime, str, int]] = None,
+        before: Optional[Union[datetime, str, int]] = None,
         oldest_first: bool = True,
+        **kwargs,
     ) -> list[dict]:
         """Stored messages, filtered the way :meth:`DiscordRest.messages` filters them.
 
-        Messages are stored oldest first. ``after`` and ``before`` are message ids,
-        compared as Discord snowflakes, that is, as integers.
+        Messages are stored oldest first. ``after`` and ``before`` take a message id,
+        compared as a Discord snowflake (an integer), or a datetime, compared with each
+        message's ``created_at``. Other keyword arguments are accepted and ignored.
 
         >>> backend = DictBackend(messages={'10': [{'id': '1'}, {'id': '2'}, {'id': '3'}]})
         >>> [m['id'] for m in backend.messages('10', after='1', limit=1)]
@@ -476,11 +487,18 @@ class DictBackend:
         >>> [m['id'] for m in backend.messages('10', oldest_first=False, limit=1)]
         ['3']
         """
+
+        def position(message, bound):
+            """Where a message sits, and the bound, in comparable terms."""
+            if isinstance(bound, datetime):
+                return datetime.fromisoformat(message["created_at"]), bound
+            return int(message["id"]), int(bound)
+
         found = list(self._messages.get(str(channel_id), ()))
         if after is not None:
-            found = [m for m in found if int(m["id"]) > int(after)]
+            found = [m for m in found if operator.gt(*position(m, after))]
         if before is not None:
-            found = [m for m in found if int(m["id"]) < int(before)]
+            found = [m for m in found if operator.lt(*position(m, before))]
         if not oldest_first:
             found.reverse()
         return found if limit is None else found[:limit]

@@ -7,15 +7,20 @@ channel, and a text channel the bot is not allowed to read. Every name is invent
 """
 
 import json
+from datetime import datetime, timezone
 
 import cw
+import discord
 import pytest
 
 from discorddol import Channels, DictBackend, Forbidden
+from discorddol.base import channel_to_dict
 from discorddol.export import (
     DFLT_PAGE_SIZE,
     ChannelLogs,
+    ExportInProgress,
     MessageContentMissing,
+    _exclusive,
     check_message_content,
     default_export_dir,
     export_guild,
@@ -61,7 +66,7 @@ class FakeGuild(DictBackend):
         return super().archived_threads(channel_id, private=private)
 
     def pages(self):
-        """(channel id, kwargs) of each history page fetched; preflight peeks excluded."""
+        """(channel id, kwargs) of each history page fetched; content-check peeks excluded."""
         return [
             (channel_id, kwargs)
             for name, channel_id, kwargs in self.calls
@@ -129,22 +134,28 @@ def entry(manifest, name):
 READABLE = ['101', '102', '201', '202', '203', '204', '205']
 
 
+# --------------------------------------------------------------------------------------
+# What gets exported, and what does not
+# --------------------------------------------------------------------------------------
+
+
 def test_every_readable_channel_gets_one_jsonl_file(guild, tmp_path):
     export_guild(GUILD, tmp_path, backend=guild)
     assert sorted(exported(tmp_path)) == READABLE
     assert [m['id'] for m in exported(tmp_path)['101']] == ['1001', '1002', '1003']
 
 
-def test_manifest_gives_kind_count_and_date_range(guild, tmp_path):
+def test_manifest_gives_kind_status_count_and_date_range(guild, tmp_path):
     manifest = export_guild(GUILD, tmp_path, backend=guild)
 
     general = entry(manifest, 'general')
-    assert general['kind'] == 'text'
+    assert (general['kind'], general['status']) == ('text', 'exported')
     assert general['file'] == 'messages/101.jsonl'
     assert general['message_count'] == 3
     assert general['first_message_at'].startswith('2026-03-01')
     assert general['last_message_at'].startswith('2026-03-03')
     assert general['thread_count'] == 3
+    assert general['channel'] == guild._channels[GUILD][1]
     assert entry(manifest, 'news')['kind'] == 'announcement'
 
     on_disk = json.loads((tmp_path / 'manifest.json').read_text(encoding='utf-8'))
@@ -160,6 +171,7 @@ def test_category_voice_and_stage_are_skipped_with_a_reason(guild, tmp_path):
     assert 'category' in reasons['Community']
     assert 'voice' in reasons['lounge']
     assert 'stage' in reasons['town-hall']
+    assert {s['name']: s['type'] for s in manifest['skipped']}['town-hall'] == 'stage_voice'
     assert not {channel_id for channel_id, _ in guild.pages()} & {'100', '104', '105'}
 
 
@@ -178,7 +190,7 @@ def test_forum_posts_are_exported_as_threads(guild, tmp_path):
 def test_private_archived_thread_is_exported_when_permitted(guild, tmp_path):
     manifest = export_guild(GUILD, tmp_path, backend=guild)
     assert [m['content'] for m in exported(tmp_path)['204']] == ['a private note']
-    assert entry(manifest, 'moderation')['type'] == 'private_thread'
+    assert entry(manifest, 'moderation')['channel']['type'] == 'private_thread'
     assert manifest['not_fetched'] == []
 
 
@@ -205,6 +217,21 @@ def test_unreadable_channel_is_skipped_with_the_reason(guild, tmp_path):
     staff = next(s for s in manifest['skipped'] if s['name'] == 'staff-only')
     assert '403' in staff['reason']
     assert '106' not in exported(tmp_path)
+    assert '106' not in {c['id'] for c in manifest['channels']}
+
+
+def test_a_local_file_error_is_not_mistaken_for_a_refusal(guild, tmp_path, monkeypatch):
+    def disk_refuses(self, channel_id, messages):
+        raise PermissionError('the disk refused')
+
+    monkeypatch.setattr(ChannelLogs, 'extend', disk_refuses)
+    with pytest.raises(PermissionError, match='the disk refused'):
+        export_guild(GUILD, tmp_path, backend=guild)
+
+
+# --------------------------------------------------------------------------------------
+# The content check
+# --------------------------------------------------------------------------------------
 
 
 def test_preflight_refuses_blank_messages_and_names_the_intent(guild, tmp_path):
@@ -219,8 +246,26 @@ def test_preflight_refuses_blank_messages_and_names_the_intent(guild, tmp_path):
     assert guild.pages() == []
 
 
+def test_preflight_tolerates_a_few_blank_messages(guild, tmp_path):
+    guild._messages['101'].append(msg(1004, 11, ''))  # a sticker, say
+    manifest = export_guild(GUILD, tmp_path, backend=guild)
+    assert manifest['run']['preflight']['status'] == 'passed'
+    assert manifest['run']['preflight']['blank'] == 1
+
+
+def test_preflight_does_not_count_bot_messages():
+    """A bot's own messages keep their content without the intent, so they prove nothing."""
+    bot = {'id': '901', 'name': 'helper', 'display_name': 'Helper', 'bot': True}
+    backend = DictBackend(
+        messages={'10': [msg(1, 1, 'a bot keeps its text', author=bot), msg(2, 1, ''), msg(3, 1, '')]}
+    )
+    with pytest.raises(MessageContentMissing):
+        check_message_content(backend, [{'id': '10'}])
+
+
 def test_preflight_can_be_skipped(guild, tmp_path):
-    guild._messages['101'][-1].update(content='', clean_content='')
+    for message in guild._messages['101']:
+        message.update(content='', clean_content='')
     manifest = export_guild(GUILD, tmp_path, backend=guild, preflight=False)
     assert manifest['run']['preflight'] == {'status': 'skipped'}
     assert sorted(exported(tmp_path)) == READABLE
@@ -241,12 +286,46 @@ def test_preflight_looks_past_system_notices_and_unreadable_channels():
         unreadable={'11'},
     )
     checked = check_message_content(backend, [{'id': '10'}, {'id': '11'}, {'id': '12'}])
-    assert checked == {'status': 'passed', 'channel_id': '12', 'message_id': '3'}
+    assert checked == {'status': 'passed', 'checked': 1, 'blank': 0}
 
 
-def test_preflight_is_inconclusive_when_there_is_nothing_to_check():
+def test_preflight_is_inconclusive_when_there_is_nothing_to_judge():
     checked = check_message_content(DictBackend(), [{'id': '10'}])
-    assert checked['status'] == 'inconclusive'
+    assert checked == {'status': 'inconclusive', 'checked': 0, 'blank': 0}
+
+
+def quiet_guild(thread_text):
+    """A guild whose channel shows only a pin notice; people write in an archived thread."""
+    return FakeGuild(
+        channels={GUILD: [{'id': '101', 'name': 'general', 'type': 'text'}]},
+        threads={'101': [thread('202', 'old-idea', '101', archived=True)]},
+        messages={
+            '101': [msg(1001, 1, '', type='MessageType.pins_add')],
+            '202': [msg(1041 + i, 7, thread_text) for i in range(5)],
+        },
+    )
+
+
+def test_export_judges_what_it_fetches_when_the_preflight_had_nothing_to_judge(tmp_path):
+    with pytest.raises(MessageContentMissing):
+        export_guild(GUILD, tmp_path, backend=quiet_guild(''), sample_size=3)
+    assert '202' not in exported(tmp_path)  # refused before the blank page was written
+
+
+def test_export_confirms_content_when_the_preflight_had_nothing_to_judge(tmp_path):
+    manifest = export_guild(GUILD, tmp_path, backend=quiet_guild('hello'), sample_size=3)
+    assert manifest['run']['preflight'] == {
+        'status': 'passed',
+        'checked': 5,
+        'blank': 0,
+        'during': 'export',
+    }
+    assert len(exported(tmp_path)['202']) == 5
+
+
+# --------------------------------------------------------------------------------------
+# Incremental, resumable, one run at a time
+# --------------------------------------------------------------------------------------
 
 
 def test_rerun_fetches_only_new_messages(guild, tmp_path):
@@ -306,6 +385,103 @@ def test_resumes_after_a_crash_without_losing_or_repeating_messages(guild, tmp_p
     assert [m['id'] for m in exported(tmp_path)['101']] == ['1001', '1002', '1003']
     assert entry(manifest, 'general')['message_count'] == 3
     assert sorted(exported(tmp_path)) == READABLE
+
+
+def test_a_channel_gone_from_the_listing_is_marked_not_in_last_run(guild, tmp_path):
+    export_guild(GUILD, tmp_path, backend=guild)
+    guild._channels[GUILD] = [c for c in guild._channels[GUILD] if c['name'] != 'news']
+
+    manifest = export_guild(GUILD, tmp_path, backend=guild)
+
+    news = entry(manifest, 'news')
+    assert (news['status'], news['message_count']) == ('not in last run', 1)
+    assert entry(manifest, 'general')['status'] == 'exported'
+
+
+def test_a_channel_refused_after_an_earlier_export_keeps_its_entry(guild, tmp_path):
+    export_guild(GUILD, tmp_path, backend=guild)
+    guild.unreadable.add('102')
+
+    manifest = export_guild(GUILD, tmp_path, backend=guild)
+
+    news = entry(manifest, 'news')
+    assert (news['status'], news['message_count']) == ('skipped', 1)
+    assert 'news' in {s['name'] for s in manifest['skipped']}
+
+
+def test_a_second_export_into_the_same_folder_is_refused(guild, tmp_path):
+    with _exclusive(tmp_path):
+        with pytest.raises(ExportInProgress):
+            export_guild(GUILD, tmp_path, backend=guild)
+    assert list(exported(tmp_path)) == []  # nothing written while refused
+
+    export_guild(GUILD, tmp_path, backend=guild)  # free again once the first is done
+    assert sorted(exported(tmp_path)) == READABLE
+
+
+def test_reading_an_export_never_changes_its_files(tmp_path):
+    logs = ChannelLogs(tmp_path)
+    logs.extend('10', [msg(1, 1)])
+    with logs.path('10').open('a', encoding='utf-8') as file:
+        file.write('{"id": "2')  # an interrupted append
+    written = logs.path('10').read_bytes()
+
+    assert logs.summary('10')['message_count'] == 1
+    assert [m['id'] for m in logs['10']] == ['1']
+    assert logs.path('10').read_bytes() == written
+
+    logs.extend('10', [msg(3, 2)])  # the writer drops the half line first
+    assert [m['id'] for m in logs['10']] == ['1', '3']
+
+
+# --------------------------------------------------------------------------------------
+# The backend and the stores
+# --------------------------------------------------------------------------------------
+
+
+class UncachedGuild:
+    """A guild as REST-only discord.py sees it: nothing in its channel cache."""
+
+    id = 1
+    name = 'Example Guild'
+
+    def get_channel(self, channel_id):
+        return None
+
+
+def test_a_real_thread_converts_although_its_parent_is_not_cached():
+    """discord.py raises when asked an uncached thread's category; the record must not."""
+    data = {
+        'id': '201',
+        'parent_id': '101',
+        'owner_id': '900',
+        'name': 'release-plans',
+        'type': 11,
+        'last_message_id': '1031',
+        'message_count': 1,
+        'member_count': 1,
+        'thread_metadata': {
+            'archived': True,
+            'auto_archive_duration': 1440,
+            'archive_timestamp': '2026-03-06T10:00:00+00:00',
+            'locked': False,
+        },
+    }
+    record = channel_to_dict(discord.Thread(guild=UncachedGuild(), state=None, data=data))
+    assert record['type'] == 'public_thread'
+    assert (record['parent_id'], record['archived'], record['last_message_id']) == (
+        '101',
+        True,
+        '1031',
+    )
+    assert (record['is_thread'], record['category']) == (True, None)
+
+
+def test_dict_backend_takes_datetime_bounds_and_ignores_other_keywords():
+    backend = DictBackend(messages={'10': [msg(1, 1), msg(2, 2), msg(3, 3)]})
+    noon_on_the_first = datetime(2026, 3, 1, 12, tzinfo=timezone.utc)
+    assert [m['id'] for m in backend.messages('10', after=noon_on_the_first)] == ['2', '3']
+    assert len(backend.messages('10', around='2')) == 3
 
 
 def test_a_forum_in_the_channels_store_reads_as_its_posts(guild):

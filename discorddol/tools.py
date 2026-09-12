@@ -117,9 +117,10 @@ def export_guild(
     voice and stage channels are skipped, and the manifest says why. Re-running on the
     same ``out_dir`` fetches only new messages, so an interrupted export resumes.
 
-    Before writing anything, one message is fetched to check that message bodies are
-    not blank, which is what a disabled Message Content Intent looks like;
-    ``skip_preflight`` turns that check off. ``out_dir`` defaults to
+    Before writing anything, recent messages are sampled to check that message bodies
+    are not blank, which is what a disabled Message Content Intent looks like;
+    ``skip_preflight`` turns that check off. Only one export at a time may write to a
+    folder. ``out_dir`` defaults to
     ``exports/<guild id>`` in discorddol's data folder. Progress goes to stderr unless
     ``quiet``. Returns a summary; the details are in the manifest.
     """

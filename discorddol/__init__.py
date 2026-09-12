@@ -35,7 +35,12 @@ from .base import (
     get_token,
     message_to_dict,
 )
-from .export import ChannelLogs, MessageContentMissing, export_guild
+from .export import (
+    ChannelLogs,
+    ExportInProgress,
+    MessageContentMissing,
+    export_guild,
+)
 from .local_cache import (
     CachedAttachments,
     cached_channel_ids,
@@ -59,6 +64,7 @@ __all__ = [
     "export_guild",
     "ChannelLogs",
     "MessageContentMissing",
+    "ExportInProgress",
     "CachedAttachments",
     "cached_channel_ids",
     "orphan_channel_ids",
