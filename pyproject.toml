@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "discorddol"
-version = "0.0.2"
+version = "0.0.3"
 description = "Discord data object layers: read guilds, channels, threads and messages as Mappings"
 readme = "README.md"
 license = "Apache-2.0"
