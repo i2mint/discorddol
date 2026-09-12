@@ -9,10 +9,13 @@ and gets a clean JSON-ready value back. ``__main__.py`` builds the CLI off the s
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Optional
 
 from .base import Channels, DiscordRest, Guilds, as_text
+from .export import MANIFEST_FILENAME, default_export_dir
+from .export import export_guild as _export_guild
 
 __all__ = [
     "guilds",
@@ -20,6 +23,7 @@ __all__ = [
     "messages",
     "transcript",
     "export_channel",
+    "export_guild",
     "find_deleted_channels",
     "recover_attachments",
     "post_message",
@@ -98,6 +102,50 @@ def export_channel(
     return {"path": str(path), "n_messages": len(records), "channel": info}
 
 
+def export_guild(
+    guild: str,
+    *,
+    out_dir: Optional[str] = None,
+    token: Optional[str] = None,
+    skip_preflight: bool = False,
+    quiet: bool = False,
+) -> dict:
+    """Export every channel the bot can read in a server, one JSONL file per channel.
+
+    Text and announcement channels, forum posts, and threads (active, archived, and
+    private archived ones when the bot has Manage Threads) are exported. Categories,
+    voice and stage channels are skipped, and the manifest says why. Re-running on the
+    same ``out_dir`` fetches only new messages, so an interrupted export resumes.
+
+    Before writing anything, recent messages are sampled to check that message bodies
+    are not blank, which is what a disabled Message Content Intent looks like;
+    ``skip_preflight`` turns that check off. Only one export at a time may write to a
+    folder. ``out_dir`` defaults to
+    ``exports/<guild id>`` in discorddol's data folder. Progress goes to stderr unless
+    ``quiet``. Returns a summary; the details are in the manifest.
+    """
+    store = Guilds(token=token)
+    record = store._records()[store._resolve(guild)]
+    out = Path(out_dir).expanduser() if out_dir else default_export_dir(record["id"])
+    manifest = _export_guild(
+        record["id"],
+        out,
+        backend=store.backend,
+        guild_name=record.get("name"),
+        preflight=not skip_preflight,
+        log=None if quiet else (lambda line: print(line, file=sys.stderr)),
+    )
+    return {
+        "out_dir": str(out),
+        "manifest": str(out / MANIFEST_FILENAME),
+        **manifest["run"],
+        "channels": len(manifest["channels"]),
+        "messages": sum(c["message_count"] for c in manifest["channels"]),
+        "skipped": len(manifest["skipped"]),
+        "not_fetched": len(manifest["not_fetched"]),
+    }
+
+
 def find_deleted_channels(
     guild: str, *, token: Optional[str] = None, cache_dir: Optional[str] = None
 ) -> dict:
@@ -146,6 +194,7 @@ DISPATCH_FUNCS = [
     messages,
     transcript,
     export_channel,
+    export_guild,
     find_deleted_channels,
     recover_attachments,
     post_message,

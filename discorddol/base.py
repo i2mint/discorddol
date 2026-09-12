@@ -1,10 +1,11 @@
 """Core of discorddol: a Discord read backend and the ``Mapping`` stores over it.
 
 The design has one hinge: **the backend**. Everything user-facing is a ``Mapping``
-whose data comes from a backend object exposing four methods -- ``guilds``,
-``channels``, ``threads``, ``messages`` -- each returning plain JSON-able dicts. The
-default backend (:class:`DiscordRest`) talks to the live Discord API; swapping it for
-one that reads a Discord data export, or a dict of fixtures, changes nothing above it.
+whose data comes from a backend object exposing five methods -- ``guilds``,
+``channels``, ``threads``, ``archived_threads``, ``messages`` -- each returning plain
+JSON-able dicts. The default backend (:class:`DiscordRest`) talks to the live Discord
+API; swapping it for one that reads a Discord data export, or a dict of fixtures,
+changes nothing above it.
 
 The stores::
 
@@ -16,7 +17,7 @@ so the common case reads like plain Python::
 
     from discorddol import Guilds
 
-    msgs = Guilds()['Cosmograph']['user-feedback']
+    msgs = Guilds()['Example Guild']['feedback']
 
 ``DiscordRest`` uses discord.py in REST-only mode -- it logs in over HTTP but never
 opens a gateway connection. That makes every call a one-shot fetch that returns
@@ -26,15 +27,20 @@ promptly, instead of a bot process you have to keep alive and shut down.
 from __future__ import annotations
 
 import asyncio
+import operator
 import os
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, Callable, Iterator, MutableMapping, Optional, Protocol
+from typing import Any, Callable, Iterator, MutableMapping, Optional, Protocol, Union
 
 __all__ = [
     "get_token",
     "message_to_dict",
     "channel_to_dict",
+    "channel_kind",
+    "CHANNEL_KINDS",
+    "Forbidden",
+    "NotFound",
     "DiscordRest",
     "DictBackend",
     "Channels",
@@ -127,11 +133,18 @@ def message_to_dict(message) -> dict:
 def channel_to_dict(channel) -> dict:
     """Serialize a channel or thread to a plain dict."""
     guild = getattr(channel, "guild", None)
+    is_thread = type(channel).__name__ == "Thread"
     return {
         "id": str(channel.id),
         "name": getattr(channel, "name", None),
         "type": str(getattr(channel, "type", type(channel).__name__)),
-        "category": getattr(getattr(channel, "category", None), "name", None),
+        # A thread's category is its parent's, which discord.py looks up in a cache
+        # that REST-only mode never fills, and it raises rather than return None.
+        "category": (
+            None
+            if is_thread
+            else getattr(getattr(channel, "category", None), "name", None)
+        ),
         "topic": getattr(channel, "topic", None),
         "created_at": (
             channel.created_at.isoformat()
@@ -143,8 +156,50 @@ def channel_to_dict(channel) -> dict:
         "parent_id": str(channel.parent_id)
         if getattr(channel, "parent_id", None)
         else None,
-        "is_thread": type(channel).__name__ == "Thread",
+        "is_thread": is_thread,
+        "archived": getattr(channel, "archived", None),
+        "last_message_id": (
+            str(channel.last_message_id)
+            if getattr(channel, "last_message_id", None)
+            else None
+        ),
     }
+
+
+#: Discord's channel type (``str(channel.type)``) -> the kind discorddol reports.
+CHANNEL_KINDS = {
+    "text": "text",
+    "news": "announcement",
+    "forum": "forum",
+    "media": "media",
+    "public_thread": "thread",
+    "private_thread": "thread",
+    "news_thread": "thread",
+    "category": "category",
+    "voice": "voice",
+    "stage_voice": "stage",
+}
+
+#: Kinds with no message history of their own: a forum's messages are in its posts,
+#: which are threads, and a category only groups other channels.
+NO_HISTORY_KINDS = frozenset({"category", "forum", "media"})
+
+
+def channel_kind(record: dict) -> str:
+    """The kind of a channel record: ``'text'``, ``'announcement'``, ``'forum'``, ...
+
+    A record without a type counts as a text channel, which is what a hand-written
+    fixture usually means. An unknown type comes back as it is.
+
+    >>> channel_kind({'type': 'news'})
+    'announcement'
+    >>> channel_kind({'type': 'ChannelType.stage_voice'})
+    'stage'
+    >>> channel_kind({'id': '10'})
+    'text'
+    """
+    raw = str(record.get("type") or "text").rsplit(".", 1)[-1]
+    return CHANNEL_KINDS.get(raw, raw)
 
 
 # --------------------------------------------------------------------------------------
@@ -152,12 +207,29 @@ def channel_to_dict(channel) -> dict:
 # --------------------------------------------------------------------------------------
 
 
+class Forbidden(PermissionError):
+    """Discord refused a request (HTTP 403): the bot's role lacks a permission for it."""
+
+
+class NotFound(LookupError):
+    """Discord has no such object (HTTP 404), or does not show it to the bot."""
+
+
 class Backend(Protocol):
-    """What a discorddol backend must provide. Four methods, all returning plain dicts."""
+    """What a discorddol backend must provide. Five methods, all returning plain dicts.
+
+    ``channels`` lists a guild's channels together with its active threads. A backend
+    raises a :class:`PermissionError` (such as :class:`Forbidden`) when it is refused
+    and :class:`NotFound` when the object is gone, so code above the backend can handle
+    both without knowing which backend it has.
+    """
 
     def guilds(self) -> list[dict]: ...
     def channels(self, guild_id: str) -> list[dict]: ...
     def threads(self, channel_id: str) -> list[dict]: ...
+    def archived_threads(
+        self, channel_id: str, *, private: bool = False
+    ) -> list[dict]: ...
     def messages(self, channel_id: str, **kwargs) -> list[dict]: ...
 
 
@@ -186,7 +258,11 @@ class DiscordRest:
         return self._token
 
     def _run(self, coro_factory):
-        """Log in, run one interaction, close. No gateway connection is opened."""
+        """Log in, run one interaction, close. No gateway connection is opened.
+
+        Discord's 403 and 404 are re-raised as :class:`Forbidden` and :class:`NotFound`,
+        so callers can handle them without importing discord.py.
+        """
         import discord
 
         token = self.token
@@ -197,7 +273,16 @@ class DiscordRest:
                 await client.login(token)
                 return await coro_factory(client)
 
-        return asyncio.run(main())
+        try:
+            return asyncio.run(main())
+        except discord.Forbidden as error:
+            raise Forbidden(
+                f"Discord refused the request (403): {error.text}"
+            ) from error
+        except discord.NotFound as error:
+            raise NotFound(
+                f"Discord found nothing there (404): {error.text}"
+            ) from error
 
     def guilds(self) -> list[dict]:
         """List servers the bot has been added to."""
@@ -242,23 +327,69 @@ class DiscordRest:
 
         return self._run(fetch)
 
+    def archived_threads(self, channel_id: str, *, private: bool = False) -> list[dict]:
+        """List a channel's archived threads: the public ones, or the private ones.
+
+        Listing private archived threads needs the Manage Threads permission; without it
+        Discord answers 403, raised as :class:`Forbidden`. Only text channels hold
+        private threads, so ``private=True`` on any other channel returns an empty list.
+        """
+        import discord
+
+        async def fetch(client):
+            channel = await client.fetch_channel(int(channel_id))
+            if not hasattr(channel, "archived_threads"):
+                return []
+            if not private:
+                return [
+                    channel_to_dict(t)
+                    async for t in channel.archived_threads(limit=None)
+                ]
+            if getattr(channel, "type", None) != discord.ChannelType.text:
+                return []
+            return [
+                channel_to_dict(t)
+                async for t in channel.archived_threads(limit=None, private=True)
+            ]
+
+        return self._run(fetch)
+
     def messages(
         self,
         channel_id: str,
         *,
         limit: Optional[int] = None,
-        after: Optional[datetime] = None,
-        before: Optional[datetime] = None,
+        after: Optional[Union[datetime, str, int]] = None,
+        before: Optional[Union[datetime, str, int]] = None,
         oldest_first: bool = True,
     ) -> list[dict]:
-        """Fetch a channel's message history. ``limit=None`` means the whole thing."""
+        """Fetch a channel's message history. ``limit=None`` means the whole thing.
+
+        ``after`` and ``before`` take a datetime or a message id, so the id of the last
+        message already stored works as a cursor.
+        """
+        import discord
+
+        def bound(value):
+            if value is None or isinstance(value, datetime):
+                return value
+            return discord.Object(id=int(value))
 
         async def fetch(client):
             channel = await client.fetch_channel(int(channel_id))
+            if not hasattr(channel, "history"):
+                raise TypeError(
+                    f"Channel {channel_id} is a {channel.type} channel, which has no "
+                    f"message history of its own. A forum's messages are in its "
+                    f"posts: list them with threads() or archived_threads()."
+                )
             return [
                 self.message_to_dict(m)
                 async for m in channel.history(
-                    limit=limit, after=after, before=before, oldest_first=oldest_first
+                    limit=limit,
+                    after=bound(after),
+                    before=bound(before),
+                    oldest_first=oldest_first,
                 )
             ]
 
@@ -282,12 +413,12 @@ class DictBackend:
     """In-memory backend over plain dicts. Real enough for tests, fixtures and exports.
 
     >>> backend = DictBackend(
-    ...     guilds=[{'id': '1', 'name': 'Cosmograph'}],
+    ...     guilds=[{'id': '1', 'name': 'Example Guild'}],
     ...     channels={'1': [{'id': '10', 'name': 'dev'}]},
     ...     messages={'10': [{'id': '100', 'content': 'hi'}]},
     ... )
     >>> backend.guilds()
-    [{'id': '1', 'name': 'Cosmograph'}]
+    [{'id': '1', 'name': 'Example Guild'}]
     >>> backend.messages('10')
     [{'id': '100', 'content': 'hi'}]
     """
@@ -314,11 +445,67 @@ class DictBackend:
     def threads(self, channel_id: str) -> list[dict]:
         return list(self._threads.get(str(channel_id), ()))
 
-    def messages(self, channel_id: str, **kwargs) -> list[dict]:
+    def archived_threads(self, channel_id: str, *, private: bool = False) -> list[dict]:
+        """The threads under ``channel_id`` marked ``archived``: public, or private ones.
+
+        >>> backend = DictBackend(threads={'10': [
+        ...     {'id': '20', 'type': 'public_thread', 'archived': True},
+        ...     {'id': '21', 'type': 'private_thread', 'archived': True},
+        ...     {'id': '22', 'type': 'public_thread'},
+        ... ]})
+        >>> [t['id'] for t in backend.archived_threads('10')]
+        ['20']
+        >>> [t['id'] for t in backend.archived_threads('10', private=True)]
+        ['21']
+        """
+        return [
+            thread
+            for thread in self.threads(channel_id)
+            if thread.get("archived")
+            and str(thread.get("type", "")).endswith("private_thread") == private
+        ]
+
+    def messages(
+        self,
+        channel_id: str,
+        *,
+        limit: Optional[int] = None,
+        after: Optional[Union[datetime, str, int]] = None,
+        before: Optional[Union[datetime, str, int]] = None,
+        oldest_first: bool = True,
+        **kwargs,
+    ) -> list[dict]:
+        """Stored messages, filtered the way :meth:`DiscordRest.messages` filters them.
+
+        Messages are stored oldest first. ``after`` and ``before`` take a message id,
+        compared as a Discord snowflake (an integer), or a datetime, compared with each
+        message's ``created_at``. Other keyword arguments are accepted and ignored.
+
+        >>> backend = DictBackend(messages={'10': [{'id': '1'}, {'id': '2'}, {'id': '3'}]})
+        >>> [m['id'] for m in backend.messages('10', after='1', limit=1)]
+        ['2']
+        >>> [m['id'] for m in backend.messages('10', oldest_first=False, limit=1)]
+        ['3']
+        """
+
+        def position(message, bound):
+            """Where a message sits, and the bound, in comparable terms.
+
+            A naive datetime is taken as local time, as discord.py takes it.
+            """
+            if isinstance(bound, datetime):
+                created = datetime.fromisoformat(message["created_at"])
+                return created.astimezone(), bound.astimezone()
+            return int(message["id"]), int(bound)
+
         found = list(self._messages.get(str(channel_id), ()))
-        if (limit := kwargs.get("limit")) is not None:
-            found = found[:limit]
-        return found
+        if after is not None:
+            found = [m for m in found if operator.gt(*position(m, after))]
+        if before is not None:
+            found = [m for m in found if operator.lt(*position(m, before))]
+        if not oldest_first:
+            found.reverse()
+        return found if limit is None else found[:limit]
 
 
 def _dflt_backend(backend, token):
@@ -352,6 +539,9 @@ class Channels(Mapping):
     Keys are channel names when unambiguous, and channel ids otherwise. Lookup accepts
     either form, plus a leading ``#``, so ``channels['#dev']`` and ``channels['dev']``
     and ``channels['10']`` all work.
+
+    A forum or a category has no messages of its own, so it maps to an empty list; with
+    ``include_threads=True`` a forum maps to the messages of its posts.
 
     >>> backend = DictBackend(
     ...     channels={'1': [{'id': '10', 'name': 'dev'}, {'id': '11', 'name': 'feedback'}]},
@@ -420,11 +610,14 @@ class Channels(Mapping):
         )
 
     def __getitem__(self, key) -> list[dict]:
-        store_key = self._resolve(key)
-        channel_id = self._records()[store_key]["id"]
+        record = self._records()[self._resolve(key)]
+        channel_id = record["id"]
         if self.cache_store is not None and channel_id in self.cache_store:
             return self.cache_store[channel_id]
-        messages = self.backend.messages(channel_id, **self.message_kwargs)
+        if channel_kind(record) in NO_HISTORY_KINDS:
+            messages = []
+        else:
+            messages = self.backend.messages(channel_id, **self.message_kwargs)
         if self.include_threads:
             for thread in self.backend.threads(channel_id):
                 messages.extend(
@@ -451,14 +644,14 @@ class Guilds(Mapping):
     Keys are guild names when unambiguous, ids otherwise; lookup accepts either.
 
     >>> backend = DictBackend(
-    ...     guilds=[{'id': '1', 'name': 'Cosmograph'}],
+    ...     guilds=[{'id': '1', 'name': 'Example Guild'}],
     ...     channels={'1': [{'id': '10', 'name': 'dev'}]},
     ...     messages={'10': [{'id': '100', 'content': 'hi'}]},
     ... )
     >>> guilds = Guilds(backend=backend)
     >>> list(guilds)
-    ['Cosmograph']
-    >>> guilds['Cosmograph']['dev']
+    ['Example Guild']
+    >>> guilds['Example Guild']['dev']
     [{'id': '100', 'content': 'hi'}]
     """
 
@@ -525,9 +718,9 @@ def as_text(messages, *, with_timestamps: bool = True) -> str:
     """Render message dicts as a readable transcript -- the form you feed to an LLM.
 
     >>> print(as_text([{'created_at': '2026-09-04T10:00:00',
-    ...                 'author': {'display_name': 'thor'},
+    ...                 'author': {'display_name': 'ada'},
     ...                 'clean_content': 'hello'}]))
-    [2026-09-04T10:00] thor: hello
+    [2026-09-04T10:00] ada: hello
     """
 
     def line(m):
