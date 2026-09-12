@@ -19,10 +19,10 @@ from discorddol.base import get_token
 def backend():
     """A small but realistic two-channel server."""
     return DictBackend(
-        guilds=[{'id': '1', 'name': 'Cosmograph'}],
+        guilds=[{'id': '1', 'name': 'Example Guild'}],
         channels={
             '1': [
-                {'id': '10', 'name': 'user-feedback', 'type': 'text'},
+                {'id': '10', 'name': 'feedback', 'type': 'text'},
                 {'id': '11', 'name': 'dev', 'type': 'text'},
             ]
         },
@@ -33,14 +33,14 @@ def backend():
                     'id': '100',
                     'created_at': '2026-09-01T10:00:00',
                     'author': {'display_name': 'ana', 'name': 'ana', 'bot': False},
-                    'clean_content': 'the graph is slow on 1M nodes',
+                    'clean_content': 'the page is slow to load',
                     'attachments': [],
                 },
                 {
                     'id': '101',
                     'created_at': '2026-09-02T11:00:00',
                     'author': {'display_name': 'bo', 'name': 'bo', 'bot': False},
-                    'clean_content': 'same here, and the legend overlaps',
+                    'clean_content': 'same here, and the menu overlaps',
                     'attachments': [],
                 },
             ],
@@ -49,7 +49,7 @@ def backend():
                     'id': '200',
                     'created_at': '2026-09-03T09:00:00',
                     'author': {'display_name': 'cy', 'name': 'cy', 'bot': False},
-                    'clean_content': 'shipped the LOD fix',
+                    'clean_content': 'shipped the fix',
                     'attachments': [],
                 }
             ],
@@ -69,29 +69,29 @@ def backend():
 def test_end_to_end_guild_to_transcript(backend):
     """Guilds -> Channels -> messages -> transcript, with a non-empty useful result."""
     guilds = Guilds(backend=backend)
-    assert list(guilds) == ['Cosmograph']
+    assert list(guilds) == ['Example Guild']
 
-    channels = guilds['Cosmograph']
-    assert sorted(channels) == ['dev', 'user-feedback']
+    channels = guilds['Example Guild']
+    assert sorted(channels) == ['dev', 'feedback']
 
-    messages = channels['user-feedback']
+    messages = channels['feedback']
     assert [m['id'] for m in messages] == ['100', '101']
 
     text = as_text(messages)
-    assert 'ana: the graph is slow on 1M nodes' in text
+    assert 'ana: the page is slow to load' in text
     assert '[2026-09-01T10:00]' in text
 
 
 def test_lookup_accepts_name_id_and_hash(backend):
     """A channel is reachable by name, by '#name', and by id."""
     channels = Channels('1', backend=backend)
-    assert channels['user-feedback'] == channels['#user-feedback'] == channels['10']
+    assert channels['feedback'] == channels['#feedback'] == channels['10']
 
 
 def test_missing_channel_error_lists_what_exists(backend):
     """A wrong key says what the right ones are -- errors are part of the UX."""
     channels = Channels('1', backend=backend)
-    with pytest.raises(KeyError, match='user-feedback'):
+    with pytest.raises(KeyError, match='feedback'):
         channels['no-such-channel']
 
 
@@ -103,8 +103,8 @@ def test_info_exposes_channel_metadata(backend):
 
 def test_include_threads_merges_thread_messages_in_time_order(backend):
     """Thread content is part of 'the whole channel', and interleaves by timestamp."""
-    without = Channels('1', backend=backend)['user-feedback']
-    with_threads = Channels('1', backend=backend, include_threads=True)['user-feedback']
+    without = Channels('1', backend=backend)['feedback']
+    with_threads = Channels('1', backend=backend, include_threads=True)['feedback']
     assert len(with_threads) == len(without) + 1
     stamps = [m['created_at'] for m in with_threads]
     assert stamps == sorted(stamps)
@@ -114,21 +114,21 @@ def test_cache_store_seam_avoids_refetching(backend):
     """With a cache_store, a second read serves from the store instead of the backend."""
     cache = {}
     channels = Channels('1', backend=backend, cache_store=cache)
-    first = channels['user-feedback']
+    first = channels['feedback']
     assert '10' in cache
 
     # Empty the backend; the cached read must still succeed.
     backend._messages['10'] = []
-    assert channels['user-feedback'] == first
+    assert channels['feedback'] == first
 
 
 def test_limit_is_passed_through_to_the_backend(backend):
-    assert len(Channels('1', backend=backend, limit=1)['user-feedback']) == 1
+    assert len(Channels('1', backend=backend, limit=1)['feedback']) == 1
 
 
 def test_records_are_json_serializable(backend):
     """Every surface (CLI, MCP, HTTP) needs plain JSON to cross its boundary."""
-    messages = Guilds(backend=backend)['Cosmograph']['user-feedback']
+    messages = Guilds(backend=backend)['Example Guild']['feedback']
     assert json.loads(json.dumps(messages)) == messages
 
 
@@ -162,11 +162,11 @@ def test_dol_store_works_as_a_persistent_cache(backend, tmp_path):
     from dol import JsonFiles
 
     first = Channels('1', backend=backend, cache_store=JsonFiles(str(tmp_path)))[
-        'user-feedback'
+        'feedback'
     ]
     backend._messages['10'] = []  # a fresh fetch would now return nothing
 
     second = Channels('1', backend=backend, cache_store=JsonFiles(str(tmp_path)))[
-        'user-feedback'
+        'feedback'
     ]
     assert second == first
