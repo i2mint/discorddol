@@ -5,10 +5,10 @@ Read a Discord server the way you read a dict.
 ```python
 from discorddol import Guilds, as_text
 
-guilds = Guilds()                     # servers your bot can see
-channels = guilds['Cosmograph']       # Mapping: channel name -> messages
-messages = channels['user-feedback']  # list of plain dicts
-print(as_text(messages))              # readable transcript
+guilds = Guilds()  # servers your bot can see
+channels = guilds["Cosmograph"]  # Mapping: channel name -> messages
+messages = channels["user-feedback"]  # list of plain dicts
+print(as_text(messages))  # readable transcript
 ```
 
 Or from the command line:
@@ -66,15 +66,17 @@ Everything is a `collections.abc.Mapping`, so the usual idioms work: `in`, `len`
 Channel lookup accepts a name, a `#name`, or an id, so all three of these are the same channel:
 
 ```python
-channels['user-feedback']
-channels['#user-feedback']
-channels['1053014662142251079']
+channels["user-feedback"]
+channels["#user-feedback"]
+channels["1053014662142251079"]
 ```
 
 Threads are where a lot of real discussion ends up. They are not merged in by default, because it changes what "the channel" means:
 
 ```python
-Channels(guild_id, include_threads=True)['user-feedback']  # messages and thread replies, in time order
+Channels(guild_id, include_threads=True)[
+    "user-feedback"
+]  # messages and thread replies, in time order
 ```
 
 Fetching a busy channel is slow and rate-limited, so pass any `MutableMapping` as a cache and repeat reads come from it. A `dict` works; so does anything from [dol](https://github.com/i2mint/dol), which is how you get a persistent one:
@@ -82,7 +84,7 @@ Fetching a busy channel is slow and rate-limited, so pass any `MutableMapping` a
 ```python
 from dol import JsonFiles
 
-channels = Channels(guild_id, cache_store=JsonFiles('~/.cache/discord'))
+channels = Channels(guild_id, cache_store=JsonFiles("~/.cache/discord"))
 ```
 
 Use `JsonFiles` rather than `Files` — cached values are lists of dicts, not bytes. The cache is keyed by channel id and survives across processes, so a second run of a long export starts from what the first one already fetched.
@@ -123,10 +125,10 @@ Four seams, each one keyword argument:
 from discorddol import Channels, DictBackend
 
 backend = DictBackend(
-    channels={'1': [{'id': '10', 'name': 'dev'}]},
-    messages={'10': [{'id': '100', 'clean_content': 'hi'}]},
+    channels={"1": [{"id": "10", "name": "dev"}]},
+    messages={"10": [{"id": "100", "clean_content": "hi"}]},
 )
-Channels('1', backend=backend)['dev']
+Channels("1", backend=backend)["dev"]
 ```
 
 ## Other surfaces
@@ -136,5 +138,5 @@ Channels('1', backend=backend)['dev']
 ```python
 from py2mcp import mk_mcp_from_refs
 
-mk_mcp_from_refs(['discorddol.tools:transcript', 'discorddol.tools:channels'])
+mk_mcp_from_refs(["discorddol.tools:transcript", "discorddol.tools:channels"])
 ```
