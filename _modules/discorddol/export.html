@@ -1,0 +1,872 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>discorddol.export &mdash; discorddol 0.0.2 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=e3a6060d"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/toggleprompt.js?v=d7ede5d2"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            discorddol
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol.html">discorddol</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/__main__.html">discorddol.__main__</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/base.html">discorddol.base</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/export.html">discorddol.export</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/local_cache.html">discorddol.local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tests/test_export.html">discorddol.tests.test_export</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tests/test_local_cache.html">discorddol.tests.test_local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tests/test_smoke.html">discorddol.tests.test_smoke</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../module_docs/discorddol/tools.html">discorddol.tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">discorddol</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">discorddol.export</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for discorddol.export</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Export a whole guild to disk: every channel the bot can read, one JSONL file each.</span>
+
+<span class="sd">:func:`export_guild` walks a guild's channel listing and writes::</span>
+
+<span class="sd">    &lt;out_dir&gt;/</span>
+<span class="sd">        manifest.json                 what was exported, what was skipped, and why</span>
+<span class="sd">        messages/&lt;channel_id&gt;.jsonl   one message dict per line, oldest first</span>
+
+<span class="sd">What gets exported, by channel kind (see :data:`discorddol.base.CHANNEL_KINDS`):</span>
+
+<span class="sd">- **text** and **announcement** channels: their own history, then their threads;</span>
+<span class="sd">- **forum** and **media** channels: their posts, which are threads;</span>
+<span class="sd">- **threads**: the active ones, the public archived ones, and the private archived ones</span>
+<span class="sd">  when the bot has Manage Threads. When it does not, the manifest lists what was not</span>
+<span class="sd">  fetched under ``not_fetched``, and the export carries on.</span>
+
+<span class="sd">Categories, voice and stage channels are not exported, and neither is a channel whose</span>
+<span class="sd">history Discord refuses to hand over. Each is listed under ``skipped`` with its reason.</span>
+
+<span class="sd">**Incremental and resumable.** A channel's file is its own cursor: a run reads the id on</span>
+<span class="sd">the file's last complete line and fetches only messages after it, a page at a time,</span>
+<span class="sd">appending as it goes. An interrupted run loses at most the page it was writing; the next</span>
+<span class="sd">run drops a half-written last line before appending, and carries on from there. A</span>
+<span class="sd">channel whose ``last_message_id`` is already in its file is not fetched at all. Only one</span>
+<span class="sd">run at a time may write to a folder; another is refused with :class:`ExportInProgress`.</span>
+
+<span class="sd">**Content check.** Without the Message Content intent, Discord still returns every</span>
+<span class="sd">message, but with its text, attachments and embeds blanked. An export in that state</span>
+<span class="sd">looks like a success and holds nothing. So before anything is written,</span>
+<span class="sd">:func:`check_message_content` samples recent messages written by people, a few from</span>
+<span class="sd">each channel, and refuses to go on when most of them are blank. Until a full sample has</span>
+<span class="sd">been judged, the export goes on judging the messages it fetches in the same way, and</span>
+<span class="sd">refuses as soon as they show blank bodies, or at the latest when the run ends. Messages</span>
+<span class="sd">written before that point stay on disk, so delete an export refused this way.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">errno</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timezone</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">NO_HISTORY_KINDS</span><span class="p">,</span> <span class="n">Backend</span><span class="p">,</span> <span class="n">NotFound</span><span class="p">,</span> <span class="n">_dflt_backend</span><span class="p">,</span> <span class="n">channel_kind</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"export_guild"</span><span class="p">,</span>
+    <span class="s2">"check_message_content"</span><span class="p">,</span>
+    <span class="s2">"MessageContentMissing"</span><span class="p">,</span>
+    <span class="s2">"ExportInProgress"</span><span class="p">,</span>
+    <span class="s2">"ChannelLogs"</span><span class="p">,</span>
+    <span class="s2">"default_export_dir"</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="n">MANIFEST_VERSION</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">MANIFEST_FILENAME</span> <span class="o">=</span> <span class="s2">"manifest.json"</span>
+<span class="n">MESSAGES_DIRNAME</span> <span class="o">=</span> <span class="s2">"messages"</span>
+<span class="n">LOCK_FILENAME</span> <span class="o">=</span> <span class="s2">".export.lock"</span>
+<span class="n">DFLT_PAGE_SIZE</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">APP_NAME</span> <span class="o">=</span> <span class="s2">"discorddol"</span>
+<span class="n">DATA_DIR_ENVVAR</span> <span class="o">=</span> <span class="s2">"DISCORDDOL_DATA_DIR"</span>
+
+<span class="c1">#: Kinds whose threads are exported along with them.</span>
+<span class="n">THREAD_PARENT_KINDS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"text"</span><span class="p">,</span> <span class="s2">"announcement"</span><span class="p">,</span> <span class="s2">"forum"</span><span class="p">,</span> <span class="s2">"media"</span><span class="p">})</span>
+<span class="c1">#: Kinds that can hold private threads: Discord allows them in text channels only.</span>
+<span class="n">PRIVATE_THREAD_PARENT_KINDS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"text"</span><span class="p">})</span>
+<span class="c1">#: Kinds that are never exported, with the reason the manifest gives.</span>
+<span class="n">SKIP_REASONS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"category"</span><span class="p">:</span> <span class="s2">"category: it groups other channels and holds no messages"</span><span class="p">,</span>
+    <span class="s2">"voice"</span><span class="p">:</span> <span class="s2">"voice channel: not exported"</span><span class="p">,</span>
+    <span class="s2">"stage"</span><span class="p">:</span> <span class="s2">"stage channel: not exported"</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="c1">#: Message types a person writes. A system notice (a pin, a join) can be blank anyway.</span>
+<span class="n">REGULAR_MESSAGE_TYPES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"default"</span><span class="p">,</span> <span class="s2">"reply"</span><span class="p">})</span>
+<span class="c1">#: How many messages written by people make a full content-check sample.</span>
+<span class="n">CONTENT_SAMPLE_SIZE</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="c1">#: The fewest channels the preflight spreads its sample over, when there are that many.</span>
+<span class="n">CONTENT_SAMPLE_CHANNELS</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="c1">#: The share of blank messages in a sample above which content counts as missing.</span>
+<span class="n">MAX_BLANK_SHARE</span> <span class="o">=</span> <span class="mf">0.5</span>
+<span class="c1">#: Lock errors that mean another run holds the folder, rather than "cannot lock here".</span>
+<span class="n">_LOCKED_ERRNOS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="n">errno</span><span class="o">.</span><span class="n">EAGAIN</span><span class="p">,</span>
+        <span class="n">errno</span><span class="o">.</span><span class="n">EWOULDBLOCK</span><span class="p">,</span>
+        <span class="n">errno</span><span class="o">.</span><span class="n">EACCES</span><span class="p">,</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">errno</span><span class="p">,</span> <span class="s2">"EDEADLOCK"</span><span class="p">,</span> <span class="n">errno</span><span class="o">.</span><span class="n">EDEADLK</span><span class="p">),</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="default_export_dir">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.default_export_dir">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">default_export_dir</span><span class="p">(</span><span class="n">guild_id</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Where a guild's export goes when no ``out_dir`` is given: ``&lt;data&gt;/exports/&lt;id&gt;``.</span>
+
+<span class="sd">    ``&lt;data&gt;`` is ``$DISCORDDOL_DATA_DIR`` when that is set, else discorddol's app data</span>
+<span class="sd">    folder (``~/.local/share/discorddol`` on macOS and Linux). Never inside a</span>
+<span class="sd">    repository, so exported messages are not committed by accident.</span>
+<span class="sd">    """</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">DATA_DIR_ENVVAR</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">root</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">config2py</span><span class="w"> </span><span class="kn">import</span> <span class="n">AppData</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="n">AppData</span><span class="p">(</span><span class="n">APP_NAME</span><span class="p">)</span><span class="o">.</span><span class="n">app_folder</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">data</span> <span class="o">/</span> <span class="s2">"exports"</span> <span class="o">/</span> <span class="nb">str</span><span class="p">(</span><span class="n">guild_id</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+<span class="c1"># The content check</span>
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="MessageContentMissing">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.MessageContentMissing">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MessageContentMissing</span><span class="p">(</span><span class="ne">RuntimeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Message bodies come back blank: the bot's Message Content Intent is off."""</span></div>
+
+
+
+<div class="viewcode-block" id="ExportInProgress">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.ExportInProgress">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ExportInProgress</span><span class="p">(</span><span class="ne">RuntimeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Another export is already writing to the same folder."""</span></div>
+
+
+
+<div class="viewcode-block" id="check_message_content">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.check_message_content">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">check_message_content</span><span class="p">(</span>
+    <span class="n">backend</span><span class="p">:</span> <span class="n">Backend</span><span class="p">,</span>
+    <span class="n">channels</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">sample_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">CONTENT_SAMPLE_SIZE</span><span class="p">,</span>
+    <span class="n">min_channels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">CONTENT_SAMPLE_CHANNELS</span><span class="p">,</span>
+    <span class="n">max_blank_share</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">MAX_BLANK_SHARE</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Refuse to export blank messages: sample recent messages and check their content.</span>
+
+<span class="sd">    Fetches the newest messages of each channel in ``channels`` (records with an</span>
+<span class="sd">    ``id``), one call per channel, until ``sample_size`` messages written by people have</span>
+<span class="sd">    been collected. No channel supplies more than ``sample_size // min_channels`` of</span>
+<span class="sd">    them, so one channel full of stickers cannot decide the verdict. System notices and</span>
+<span class="sd">    bot messages do not count: a notice can be blank anyway, and a bot's own messages</span>
+<span class="sd">    keep their content without the intent. A message is blank when it has no text, no</span>
+<span class="sd">    attachments and no embeds, which is how Discord sends every message when the intent</span>
+<span class="sd">    is off.</span>
+
+<span class="sd">    Raises :class:`MessageContentMissing`, naming the fix, when more than</span>
+<span class="sd">    ``max_blank_share`` of the sample is blank. Returns ``{'status': 'passed',</span>
+<span class="sd">    'checked', 'blank'}``, or ``{'status': 'inconclusive', 'checked': 0, 'blank': 0}``</span>
+<span class="sd">    when there was nothing to judge.</span>
+
+<span class="sd">    &gt;&gt;&gt; from discorddol.base import DictBackend</span>
+<span class="sd">    &gt;&gt;&gt; backend = DictBackend(messages={'10': [{'id': '1', 'content': 'hi'}]})</span>
+<span class="sd">    &gt;&gt;&gt; check_message_content(backend, [{'id': '10'}])</span>
+<span class="sd">    {'status': 'passed', 'checked': 1, 'blank': 0}</span>
+<span class="sd">    """</span>
+    <span class="n">per_channel</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">sample_size</span> <span class="o">//</span> <span class="n">min_channels</span><span class="p">)</span>
+    <span class="n">sample</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">channels</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">sample_size</span><span class="p">:</span>
+            <span class="k">break</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">recent</span> <span class="o">=</span> <span class="n">backend</span><span class="o">.</span><span class="n">messages</span><span class="p">(</span>
+                <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="n">limit</span><span class="o">=</span><span class="n">sample_size</span><span class="p">,</span> <span class="n">oldest_first</span><span class="o">=</span><span class="kc">False</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">PermissionError</span><span class="p">,</span> <span class="n">NotFound</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="n">telling</span> <span class="o">=</span> <span class="p">[(</span><span class="n">record</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span> <span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="n">recent</span> <span class="k">if</span> <span class="n">_is_telling</span><span class="p">(</span><span class="n">message</span><span class="p">)]</span>
+        <span class="n">sample</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">telling</span><span class="p">[:</span><span class="n">per_channel</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">_judge_content</span><span class="p">(</span><span class="n">sample</span><span class="p">[:</span><span class="n">sample_size</span><span class="p">],</span> <span class="n">max_blank_share</span><span class="o">=</span><span class="n">max_blank_share</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_judge_content</span><span class="p">(</span><span class="n">sample</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">max_blank_share</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The verdict on ``(channel record, message)`` pairs; raises when most are blank."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">sample</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"status"</span><span class="p">:</span> <span class="s2">"inconclusive"</span><span class="p">,</span> <span class="s2">"checked"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"blank"</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
+    <span class="n">blank</span> <span class="o">=</span> <span class="p">[(</span><span class="n">record</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span><span class="p">,</span> <span class="n">message</span> <span class="ow">in</span> <span class="n">sample</span> <span class="k">if</span> <span class="n">_is_blank</span><span class="p">(</span><span class="n">message</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">blank</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_blank_share</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">sample</span><span class="p">):</span>
+        <span class="n">record</span><span class="p">,</span> <span class="n">message</span> <span class="o">=</span> <span class="n">blank</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">raise</span> <span class="n">MessageContentMissing</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">blank</span><span class="p">)</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span><span class="si">}</span><span class="s2"> messages written by people came back with "</span>
+            <span class="sa">f</span><span class="s2">"no text, attachments or embeds (message </span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'id'</span><span class="p">)</span><span class="si">}</span><span class="s2"> in "</span>
+            <span class="sa">f</span><span class="s2">"#</span><span class="si">{</span><span class="n">_name</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="si">}</span><span class="s2">, for one). That is what Discord sends when the bot's "</span>
+            <span class="sa">f</span><span class="s1">'"Message Content Intent" is off, and the export would hold nothing.</span><span class="se">\n</span><span class="s1">'</span>
+            <span class="sa">f</span><span class="s2">"Fix: https://discord.com/developers/applications -&gt; your app -&gt; Bot -&gt; "</span>
+            <span class="sa">f</span><span class="s1">'Privileged Gateway Intents -&gt; enable "Message Content Intent", then run '</span>
+            <span class="sa">f</span><span class="s2">"the export again. Anything already exported without the intent is blank "</span>
+            <span class="sa">f</span><span class="s2">"and will not be fetched again, so delete it first.</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"If these messages really are blank, run with preflight=False "</span>
+            <span class="sa">f</span><span class="s2">"(CLI: --skip-preflight)."</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"status"</span><span class="p">:</span> <span class="s2">"passed"</span><span class="p">,</span> <span class="s2">"checked"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">sample</span><span class="p">),</span> <span class="s2">"blank"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">blank</span><span class="p">)}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_telling</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Whether a blank body would say something: written by a person, not a notice."""</span>
+    <span class="n">kind</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"default"</span><span class="p">)</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">"."</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">REGULAR_MESSAGE_TYPES</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"author"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">"bot"</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_blank</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">return</span> <span class="ow">not</span> <span class="p">(</span>
+        <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"content"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"attachments"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"embeds"</span><span class="p">)</span>
+    <span class="p">)</span>
+
+
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+<span class="c1"># The files</span>
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="ChannelLogs">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.ChannelLogs">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ChannelLogs</span><span class="p">(</span><span class="n">Mapping</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Mapping: channel id -&gt; that channel's exported messages, one JSONL file each.</span>
+
+<span class="sd">    The export's writer as well as its reader: :meth:`extend` appends messages, and</span>
+<span class="sd">    :meth:`summary` gives a file's message count, date range and cursor, parsing only</span>
+<span class="sd">    its first and last lines. Files hold messages oldest first, in the order appended.</span>
+<span class="sd">    Reading never changes a file; a half-written last line is ignored until the next</span>
+<span class="sd">    :meth:`extend` drops it.</span>
+
+<span class="sd">    &gt;&gt;&gt; import tempfile</span>
+<span class="sd">    &gt;&gt;&gt; with tempfile.TemporaryDirectory() as tmp:</span>
+<span class="sd">    ...     logs = ChannelLogs(tmp)</span>
+<span class="sd">    ...     _ = logs.extend('10', [{'id': '1', 'created_at': '2026-01-01T09:00:00'}])</span>
+<span class="sd">    ...     _ = logs.extend('10', [{'id': '2', 'created_at': '2026-01-02T09:00:00'}])</span>
+<span class="sd">    ...     print(list(logs), [m['id'] for m in logs['10']], logs.summary('10'))</span>
+<span class="sd">    ['10'] ['1', '2'] {'message_count': 2, 'first_message_at': '2026-01-01T09:00:00', 'last_message_at': '2026-01-02T09:00:00', 'last_message_id': '2'}</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rootdir</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">rootdir</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span>
+
+<div class="viewcode-block" id="ChannelLogs.path">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.ChannelLogs.path">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The JSONL file of one channel."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">channel_id</span><span class="si">}</span><span class="s2">.jsonl"</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">(</span><span class="n">channel_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">channel_id</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span> <span class="k">as</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span> <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">(</span><span class="n">channel_id</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+            <span class="k">yield from</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">stem</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">rootdir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">"*.jsonl"</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ChannelLogs.extend">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.ChannelLogs.extend">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extend</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span> <span class="n">messages</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Append messages to a channel's file, creating it if needed. Returns how many."""</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">(</span><span class="n">channel_id</span><span class="p">)</span>
+        <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">_drop_partial_last_line</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span> <span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="n">messages</span><span class="p">]</span>
+        <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"a"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">file</span><span class="o">.</span><span class="n">writelines</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ChannelLogs.summary">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.ChannelLogs.summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A channel's message count, first and last dates, and last id (its cursor)."""</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">(</span><span class="n">channel_id</span><span class="p">)</span>
+        <span class="n">count</span><span class="p">,</span> <span class="n">first</span><span class="p">,</span> <span class="n">last</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">):</span>
+                        <span class="k">break</span>  <span class="c1"># an interrupted append</span>
+                    <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="n">first</span> <span class="o">=</span> <span class="n">first</span> <span class="ow">or</span> <span class="n">line</span>
+                    <span class="n">last</span> <span class="o">=</span> <span class="n">line</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">count</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_empty_summary</span><span class="p">()</span>
+        <span class="n">head</span><span class="p">,</span> <span class="n">tail</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">first</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">last</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"message_count"</span><span class="p">:</span> <span class="n">count</span><span class="p">,</span>
+            <span class="s2">"first_message_at"</span><span class="p">:</span> <span class="n">head</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"created_at"</span><span class="p">),</span>
+            <span class="s2">"last_message_at"</span><span class="p">:</span> <span class="n">tail</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"created_at"</span><span class="p">),</span>
+            <span class="s2">"last_message_id"</span><span class="p">:</span> <span class="n">tail</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"id"</span><span class="p">),</span>
+        <span class="p">}</span></div>
+</div>
+
+
+
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+<span class="c1"># The export</span>
+<span class="c1"># --------------------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="export_guild">
+<a class="viewcode-back" href="../../module_docs/discorddol/export.html#discorddol.export_guild">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">export_guild</span><span class="p">(</span>
+    <span class="n">guild_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">out_dir</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">backend</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Backend</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">guild_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">page_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DFLT_PAGE_SIZE</span><span class="p">,</span>
+    <span class="n">private_threads</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">preflight</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">sample_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">CONTENT_SAMPLE_SIZE</span><span class="p">,</span>
+    <span class="n">log</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Export every channel of a guild the bot can read into ``out_dir``.</span>
+
+<span class="sd">    Returns the manifest, which is also written to ``out_dir``. Re-running on the same</span>
+<span class="sd">    ``out_dir`` fetches only what is new (see the module docstring).</span>
+<span class="sd">    ``private_threads=False`` does not ask for private archived threads.</span>
+<span class="sd">    ``preflight=False`` turns the content check off; ``sample_size`` is how many</span>
+<span class="sd">    messages make a full sample for it. ``log`` gets one line per channel.</span>
+
+<span class="sd">    &gt;&gt;&gt; import tempfile</span>
+<span class="sd">    &gt;&gt;&gt; from discorddol.base import DictBackend</span>
+<span class="sd">    &gt;&gt;&gt; backend = DictBackend(</span>
+<span class="sd">    ...     channels={'1': [</span>
+<span class="sd">    ...         {'id': '10', 'name': 'general', 'type': 'text'},</span>
+<span class="sd">    ...         {'id': '11', 'name': 'Community', 'type': 'category'},</span>
+<span class="sd">    ...     ]},</span>
+<span class="sd">    ...     messages={'10': [{'id': '100', 'content': 'hi', 'created_at': '2026-01-01'}]},</span>
+<span class="sd">    ... )</span>
+<span class="sd">    &gt;&gt;&gt; with tempfile.TemporaryDirectory() as tmp:</span>
+<span class="sd">    ...     manifest = export_guild('1', tmp, backend=backend)</span>
+<span class="sd">    &gt;&gt;&gt; [(c['name'], c['kind'], c['message_count']) for c in manifest['channels']]</span>
+<span class="sd">    [('general', 'text', 1)]</span>
+<span class="sd">    &gt;&gt;&gt; [(s['name'], s['reason']) for s in manifest['skipped']]</span>
+<span class="sd">    [('Community', 'category: it groups other channels and holds no messages')]</span>
+<span class="sd">    """</span>
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">_dflt_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span>
+    <span class="n">out_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span>
+    <span class="n">log</span> <span class="o">=</span> <span class="n">log</span> <span class="ow">or</span> <span class="p">(</span><span class="k">lambda</span> <span class="n">line</span><span class="p">:</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">parents</span><span class="p">,</span> <span class="n">threads_by_parent</span><span class="p">,</span> <span class="n">skipped</span> <span class="o">=</span> <span class="n">_plan</span><span class="p">(</span><span class="n">backend</span><span class="o">.</span><span class="n">channels</span><span class="p">(</span><span class="n">guild_id</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">preflight</span><span class="p">:</span>
+        <span class="n">own_history</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parents</span> <span class="k">if</span> <span class="n">channel_kind</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">NO_HISTORY_KINDS</span><span class="p">]</span>
+        <span class="n">active_threads</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">threads_by_parent</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">group</span><span class="p">]</span>
+        <span class="n">checked</span> <span class="o">=</span> <span class="n">check_message_content</span><span class="p">(</span>
+            <span class="n">backend</span><span class="p">,</span> <span class="n">own_history</span> <span class="o">+</span> <span class="n">active_threads</span><span class="p">,</span> <span class="n">sample_size</span><span class="o">=</span><span class="n">sample_size</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">checked</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"status"</span><span class="p">:</span> <span class="s2">"skipped"</span><span class="p">}</span>
+    <span class="k">with</span> <span class="n">_exclusive</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="n">log</span><span class="p">):</span>
+        <span class="n">run</span> <span class="o">=</span> <span class="n">_ExportRun</span><span class="p">(</span>
+            <span class="n">backend</span><span class="p">,</span>
+            <span class="n">out_dir</span><span class="p">,</span>
+            <span class="n">guild</span><span class="o">=</span><span class="p">{</span><span class="s2">"id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">guild_id</span><span class="p">),</span> <span class="s2">"name"</span><span class="p">:</span> <span class="n">guild_name</span><span class="p">},</span>
+            <span class="n">preflight</span><span class="o">=</span><span class="n">checked</span><span class="p">,</span>
+            <span class="n">skipped</span><span class="o">=</span><span class="n">skipped</span><span class="p">,</span>
+            <span class="n">page_size</span><span class="o">=</span><span class="n">page_size</span><span class="p">,</span>
+            <span class="n">sample_size</span><span class="o">=</span><span class="n">sample_size</span><span class="p">,</span>
+            <span class="n">log</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">parent</span> <span class="ow">in</span> <span class="n">parents</span><span class="p">:</span>
+            <span class="n">run</span><span class="o">.</span><span class="n">export_with_threads</span><span class="p">(</span>
+                <span class="n">parent</span><span class="p">,</span>
+                <span class="n">active_threads</span><span class="o">=</span><span class="n">threads_by_parent</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">parent</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="p">[]),</span>
+                <span class="n">private_threads</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">private_threads</span>
+                    <span class="ow">and</span> <span class="n">channel_kind</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span> <span class="ow">in</span> <span class="n">PRIVATE_THREAD_PARENT_KINDS</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">orphans</span> <span class="ow">in</span> <span class="n">threads_by_parent</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>  <span class="c1"># active threads, no listed parent</span>
+            <span class="k">for</span> <span class="n">thread</span> <span class="ow">in</span> <span class="n">orphans</span><span class="p">:</span>
+                <span class="n">run</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">thread</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">run</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span></div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_ExportRun</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""One run of :func:`export_guild`: appends messages and keeps the manifest current.</span>
+
+<span class="sd">    Entries from an earlier run's manifest are kept, so a run that stops early still</span>
+<span class="sd">    describes every channel exported so far. An entry's ``status`` says what the latest</span>
+<span class="sd">    run did with it: ``exported``; ``skipped``, when Discord refused its history this</span>
+<span class="sd">    time (``skipped`` says why); or, once a run finishes without reaching it,</span>
+<span class="sd">    ``not in last run``, as for a channel deleted or hidden from the bot since.</span>
+<span class="sd">    ``skipped`` and ``not_fetched`` describe the latest run only.</span>
+
+<span class="sd">    ``run.preflight`` is the verdict before anything was written. When that did not</span>
+<span class="sd">    judge a full sample, ``run.content_check`` is the verdict on the messages the export</span>
+<span class="sd">    itself fetched.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">backend</span><span class="p">,</span>
+        <span class="n">out_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">guild</span><span class="p">,</span>
+        <span class="n">preflight</span><span class="p">,</span>
+        <span class="n">skipped</span><span class="p">,</span>
+        <span class="n">page_size</span><span class="p">,</span>
+        <span class="n">sample_size</span><span class="p">,</span>
+        <span class="n">log</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">backend</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logs</span> <span class="o">=</span> <span class="n">ChannelLogs</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="n">MESSAGES_DIRNAME</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">manifest_path</span> <span class="o">=</span> <span class="n">out_dir</span> <span class="o">/</span> <span class="n">MANIFEST_FILENAME</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">page_size</span> <span class="o">=</span> <span class="n">page_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sample_size</span> <span class="o">=</span> <span class="n">sample_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span> <span class="o">=</span> <span class="n">log</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="c1">#: Fetched messages to judge, until a full sample has been; None when not needed.</span>
+        <span class="n">judged_enough</span> <span class="o">=</span> <span class="n">preflight</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"checked"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">sample_size</span>
+        <span class="n">skipped_check</span> <span class="o">=</span> <span class="n">preflight</span><span class="p">[</span><span class="s2">"status"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"skipped"</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sample</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">judged_enough</span> <span class="ow">or</span> <span class="n">skipped_check</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="n">previous</span> <span class="o">=</span> <span class="n">_read_json</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">manifest_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entries</span> <span class="o">=</span> <span class="p">{</span><span class="n">entry</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]:</span> <span class="n">entry</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">previous</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"channels"</span><span class="p">,</span> <span class="p">())}</span>
+        <span class="n">earlier_name</span> <span class="o">=</span> <span class="n">previous</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"guild"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"manifest_version"</span><span class="p">:</span> <span class="n">MANIFEST_VERSION</span><span class="p">,</span>
+            <span class="s2">"guild"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"id"</span><span class="p">:</span> <span class="n">guild</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="s2">"name"</span><span class="p">:</span> <span class="n">guild</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="ow">or</span> <span class="n">earlier_name</span><span class="p">},</span>
+            <span class="s2">"run"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"started_at"</span><span class="p">:</span> <span class="n">_now</span><span class="p">(),</span>
+                <span class="s2">"finished_at"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="s2">"preflight"</span><span class="p">:</span> <span class="n">preflight</span><span class="p">,</span>
+                <span class="s2">"content_check"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="s2">"channels_exported"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">"new_messages"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="s2">"channels"</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">"skipped"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">skipped</span><span class="p">),</span>
+            <span class="s2">"not_fetched"</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">skipped</span><span class="p">:</span>
+            <span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">"skipped #</span><span class="si">{</span><span class="n">_name</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">entry</span><span class="p">[</span><span class="s1">'kind'</span><span class="p">]</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">entry</span><span class="p">[</span><span class="s1">'reason'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">export_with_threads</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">active_threads</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">private_threads</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Export a channel, then every thread under it, then save the manifest."""</span>
+        <span class="k">if</span> <span class="n">channel_kind</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span> <span class="ow">in</span> <span class="n">NO_HISTORY_KINDS</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">parent</span><span class="p">[</span><span class="s2">"id"</span><span class="p">])</span>  <span class="c1"># its messages are in its posts</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_set_entry</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">"exported"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+        <span class="n">threads</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_threads_of</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="n">active_threads</span><span class="p">,</span> <span class="n">private</span><span class="o">=</span><span class="n">private_threads</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">thread</span> <span class="ow">in</span> <span class="n">threads</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">thread</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parent</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="n">parent</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]][</span><span class="s2">"thread_count"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">threads</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">export</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Append a channel's new messages to its file and update its manifest entry."""</span>
+        <span class="n">channel_id</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">channel_id</span><span class="p">)</span>
+        <span class="n">before</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">channel_id</span><span class="p">)</span>
+        <span class="n">summary</span><span class="p">,</span> <span class="n">refusal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fetch_new_messages</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">before</span><span class="p">)</span>
+        <span class="n">added</span> <span class="o">=</span> <span class="n">summary</span><span class="p">[</span><span class="s2">"message_count"</span><span class="p">]</span> <span class="o">-</span> <span class="n">before</span><span class="p">[</span><span class="s2">"message_count"</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"run"</span><span class="p">][</span><span class="s2">"new_messages"</span><span class="p">]</span> <span class="o">+=</span> <span class="n">added</span>
+        <span class="k">if</span> <span class="n">refusal</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">reason</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"its messages could not be read: </span><span class="si">{</span><span class="n">refusal</span><span class="si">}</span><span class="s2">"</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"skipped"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_skipped</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">reason</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">"skipped #</span><span class="si">{</span><span class="n">_name</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">channel_kind</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">refusal</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">channel_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">logs</span><span class="p">:</span>  <span class="c1"># an earlier page or run wrote some</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_set_entry</span><span class="p">(</span>
+                    <span class="n">record</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">"skipped"</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="n">summary</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">channel_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="p">:</span>  <span class="c1"># exported before, file deleted since</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_set_entry</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">"skipped"</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">channel_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">logs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">channel_id</span><span class="p">,</span> <span class="p">())</span>  <span class="c1"># every exported channel gets a file</span>
+        <span class="n">entry</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_entry</span><span class="p">(</span>
+            <span class="n">record</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">"exported"</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="n">summary</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"run"</span><span class="p">][</span><span class="s2">"channels_exported"</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"#</span><span class="si">{</span><span class="n">_name</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">entry</span><span class="p">[</span><span class="s1">'kind'</span><span class="p">]</span><span class="si">}</span><span class="s2">): "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">added</span><span class="si">}</span><span class="s2"> new, </span><span class="si">{</span><span class="n">entry</span><span class="p">[</span><span class="s1">'message_count'</span><span class="p">]</span><span class="si">}</span><span class="s2"> in all"</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Mark what this run did not reach, conclude the content check, save, return.</span>
+
+<span class="sd">        A content check still open is concluded on whatever sample the run gathered,</span>
+<span class="sd">        so a small export whose messages are mostly blank is refused here.</span>
+<span class="sd">        """</span>
+        <span class="k">for</span> <span class="n">channel_id</span><span class="p">,</span> <span class="n">entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">channel_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">seen</span><span class="p">:</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">"status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"not in last run"</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_conclude_content_check</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"run"</span><span class="p">][</span><span class="s2">"finished_at"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_now</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Write the manifest as it stands."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"channels"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="n">_write_json</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">manifest_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fetch_new_messages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">summary</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Page through messages newer than the file's last line, appending each page.</span>
+
+<span class="sd">        Returns the file's summary afterwards, and Discord's refusal if one stopped the</span>
+<span class="sd">        paging. Only the backend call is guarded, so a local file error still raises.</span>
+<span class="sd">        """</span>
+        <span class="n">channel_id</span><span class="p">,</span> <span class="n">cursor</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="n">summary</span><span class="p">[</span><span class="s2">"last_message_id"</span><span class="p">]</span>
+        <span class="n">latest</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"last_message_id"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cursor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">latest</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">latest</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">int</span><span class="p">(</span><span class="n">cursor</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">summary</span><span class="p">,</span> <span class="kc">None</span>  <span class="c1"># Discord's newest message is already in the file</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">page</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">messages</span><span class="p">(</span>
+                    <span class="n">channel_id</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">page_size</span><span class="p">,</span> <span class="n">after</span><span class="o">=</span><span class="n">cursor</span><span class="p">,</span> <span class="n">oldest_first</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">PermissionError</span><span class="p">,</span> <span class="n">NotFound</span><span class="p">)</span> <span class="k">as</span> <span class="n">refusal</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">summary</span><span class="p">,</span> <span class="n">refusal</span>
+            <span class="n">fresh</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">page</span> <span class="k">if</span> <span class="n">cursor</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="s2">"id"</span><span class="p">])</span> <span class="o">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">cursor</span><span class="p">)),</span>
+                <span class="n">key</span><span class="o">=</span><span class="n">_snowflake</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">fresh</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_judge</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">fresh</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">channel_id</span><span class="p">,</span> <span class="n">fresh</span><span class="p">)</span>
+                <span class="n">summary</span> <span class="o">=</span> <span class="n">_extended</span><span class="p">(</span><span class="n">summary</span><span class="p">,</span> <span class="n">fresh</span><span class="p">)</span>
+                <span class="n">cursor</span> <span class="o">=</span> <span class="n">summary</span><span class="p">[</span><span class="s2">"last_message_id"</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">fresh</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">page</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">page_size</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">summary</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_judge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">page</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Until a full sample has been judged, judge a fetched page before writing it."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sample</span><span class="o">.</span><span class="n">extend</span><span class="p">((</span><span class="n">record</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">page</span> <span class="k">if</span> <span class="n">_is_telling</span><span class="p">(</span><span class="n">m</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_size</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_conclude_content_check</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_conclude_content_check</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Judge the export's own sample and record the verdict, saved before refusing."""</span>
+        <span class="n">sample</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">verdict</span> <span class="o">=</span> <span class="n">_judge_content</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span> <span class="n">max_blank_share</span><span class="o">=</span><span class="n">MAX_BLANK_SHARE</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">MessageContentMissing</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"run"</span><span class="p">][</span><span class="s2">"content_check"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">"status"</span><span class="p">:</span> <span class="s2">"failed"</span><span class="p">,</span>
+                <span class="s2">"checked"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">sample</span><span class="p">),</span>
+                <span class="s2">"blank"</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span><span class="n">_is_blank</span><span class="p">(</span><span class="n">message</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">message</span> <span class="ow">in</span> <span class="n">sample</span><span class="p">),</span>
+            <span class="p">}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">raise</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"run"</span><span class="p">][</span><span class="s2">"content_check"</span><span class="p">]</span> <span class="o">=</span> <span class="n">verdict</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_threads_of</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">active_threads</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">private</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""A channel's threads: its active ones, plus public and private archived ones."""</span>
+        <span class="n">found</span> <span class="o">=</span> <span class="p">{</span><span class="n">thread</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]:</span> <span class="n">thread</span> <span class="k">for</span> <span class="n">thread</span> <span class="ow">in</span> <span class="n">active_threads</span><span class="p">}</span>
+        <span class="n">sources</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">"public archived threads"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="n">private</span><span class="p">:</span>
+            <span class="n">sources</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">"private archived threads"</span><span class="p">,</span> <span class="kc">True</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">what</span><span class="p">,</span> <span class="n">is_private</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">archived</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">archived_threads</span><span class="p">(</span>
+                    <span class="n">parent</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="n">private</span><span class="o">=</span><span class="n">is_private</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">PermissionError</span><span class="p">,</span> <span class="n">NotFound</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"not_fetched"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">"channel_id"</span><span class="p">:</span> <span class="n">parent</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span>
+                        <span class="s2">"name"</span><span class="p">:</span> <span class="n">parent</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">),</span>
+                        <span class="s2">"what"</span><span class="p">:</span> <span class="n">what</span><span class="p">,</span>
+                        <span class="s2">"reason"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">),</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">"#</span><span class="si">{</span><span class="n">_name</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">what</span><span class="si">}</span><span class="s2"> not fetched: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">for</span> <span class="n">thread</span> <span class="ow">in</span> <span class="n">archived</span><span class="p">:</span>
+                <span class="n">found</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">thread</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="n">thread</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">found</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">_snowflake</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_set_entry</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">status</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">summary</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Describe a channel in the manifest: what it is, and what its file holds.</span>
+
+<span class="sd">        ``channel`` keeps the backend's full record, so an export can be read back as</span>
+<span class="sd">        a channel listing.</span>
+<span class="sd">        """</span>
+        <span class="n">channel_id</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
+        <span class="n">entry</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"id"</span><span class="p">:</span> <span class="n">channel_id</span><span class="p">,</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">),</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="n">channel_kind</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
+            <span class="s2">"parent_id"</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"parent_id"</span><span class="p">),</span>
+            <span class="s2">"parent_name"</span><span class="p">:</span> <span class="n">parent</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span> <span class="k">if</span> <span class="n">parent</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"status"</span><span class="p">:</span> <span class="n">status</span><span class="p">,</span>
+            <span class="s2">"file"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">MESSAGES_DIRNAME</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">channel_id</span><span class="si">}</span><span class="s2">.jsonl"</span> <span class="k">if</span> <span class="n">summary</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="o">**</span><span class="p">(</span><span class="n">summary</span> <span class="ow">or</span> <span class="n">_empty_summary</span><span class="p">()),</span>
+            <span class="s2">"exported_at"</span><span class="p">:</span> <span class="n">_now</span><span class="p">(),</span>
+            <span class="s2">"channel"</span><span class="p">:</span> <span class="n">record</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entries</span><span class="p">[</span><span class="n">channel_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">entry</span>
+        <span class="k">return</span> <span class="n">entry</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_plan</span><span class="p">(</span><span class="n">listing</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">dict</span><span class="p">,</span> <span class="nb">list</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Split a channel listing into thread parents, active threads by parent, and skips."""</span>
+    <span class="n">parents</span><span class="p">,</span> <span class="n">threads_by_parent</span><span class="p">,</span> <span class="n">skipped</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">{},</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">listing</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">_snowflake</span><span class="p">):</span>
+        <span class="n">kind</span> <span class="o">=</span> <span class="n">channel_kind</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"thread"</span><span class="p">:</span>
+            <span class="n">threads_by_parent</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"parent_id"</span><span class="p">),</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">THREAD_PARENT_KINDS</span><span class="p">:</span>
+            <span class="n">parents</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">reason</span> <span class="o">=</span> <span class="n">SKIP_REASONS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"unsupported channel type: </span><span class="si">{</span><span class="n">kind</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">skipped</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_skipped</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">reason</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">parents</span><span class="p">,</span> <span class="n">threads_by_parent</span><span class="p">,</span> <span class="n">skipped</span>
+
+
+<span class="nd">@contextmanager</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_exclusive</span><span class="p">(</span><span class="n">folder</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">log</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Hold an OS lock on ``folder`` for one run. The OS releases it if the run dies.</span>
+
+<span class="sd">    A filesystem that cannot lock at all, as some network mounts cannot, does not stop</span>
+<span class="sd">    the export: it runs without the lock, and says so through ``log``.</span>
+<span class="sd">    """</span>
+    <span class="n">folder</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">handle</span> <span class="o">=</span> <span class="p">(</span><span class="n">folder</span> <span class="o">/</span> <span class="n">LOCK_FILENAME</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"a+b"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"nt"</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">msvcrt</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">lock</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="n">msvcrt</span><span class="o">.</span><span class="n">LK_NBLCK</span><span class="p">):</span>
+            <span class="n">handle</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">msvcrt</span><span class="o">.</span><span class="n">locking</span><span class="p">(</span><span class="n">handle</span><span class="o">.</span><span class="n">fileno</span><span class="p">(),</span> <span class="n">mode</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">unlock</span><span class="p">():</span>
+            <span class="n">lock</span><span class="p">(</span><span class="n">msvcrt</span><span class="o">.</span><span class="n">LK_UNLCK</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">fcntl</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">lock</span><span class="p">():</span>
+            <span class="n">fcntl</span><span class="o">.</span><span class="n">flock</span><span class="p">(</span><span class="n">handle</span><span class="o">.</span><span class="n">fileno</span><span class="p">(),</span> <span class="n">fcntl</span><span class="o">.</span><span class="n">LOCK_EX</span> <span class="o">|</span> <span class="n">fcntl</span><span class="o">.</span><span class="n">LOCK_NB</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">unlock</span><span class="p">():</span>
+            <span class="n">fcntl</span><span class="o">.</span><span class="n">flock</span><span class="p">(</span><span class="n">handle</span><span class="o">.</span><span class="n">fileno</span><span class="p">(),</span> <span class="n">fcntl</span><span class="o">.</span><span class="n">LOCK_UN</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">lock</span><span class="p">()</span>
+        <span class="n">locked</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">error</span><span class="o">.</span><span class="n">errno</span> <span class="ow">in</span> <span class="n">_LOCKED_ERRNOS</span><span class="p">:</span>
+            <span class="n">handle</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">raise</span> <span class="n">ExportInProgress</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Another export is already writing to </span><span class="si">{</span><span class="n">folder</span><span class="si">}</span><span class="s2">. Let it finish, or "</span>
+                <span class="sa">f</span><span class="s2">"stop it, then run this one again."</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+        <span class="n">locked</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="p">(</span><span class="n">log</span> <span class="ow">or</span> <span class="p">(</span><span class="k">lambda</span> <span class="n">line</span><span class="p">:</span> <span class="kc">None</span><span class="p">))(</span>
+            <span class="sa">f</span><span class="s2">"could not lock </span><span class="si">{</span><span class="n">folder</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">); nothing stops a second export from "</span>
+            <span class="sa">f</span><span class="s2">"writing to it at the same time"</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">yield</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">locked</span><span class="p">:</span>
+            <span class="n">unlock</span><span class="p">()</span>
+        <span class="n">handle</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_extended</span><span class="p">(</span><span class="n">summary</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">fresh</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A file's summary after appending ``fresh``, oldest first, to it."""</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"message_count"</span><span class="p">:</span> <span class="n">summary</span><span class="p">[</span><span class="s2">"message_count"</span><span class="p">]</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">fresh</span><span class="p">),</span>
+        <span class="s2">"first_message_at"</span><span class="p">:</span> <span class="n">summary</span><span class="p">[</span><span class="s2">"first_message_at"</span><span class="p">]</span> <span class="ow">or</span> <span class="n">fresh</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"created_at"</span><span class="p">),</span>
+        <span class="s2">"last_message_at"</span><span class="p">:</span> <span class="n">fresh</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"created_at"</span><span class="p">),</span>
+        <span class="s2">"last_message_id"</span><span class="p">:</span> <span class="n">fresh</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s2">"id"</span><span class="p">],</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_skipped</span><span class="p">(</span><span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"id"</span><span class="p">:</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span>
+        <span class="s2">"name"</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">),</span>
+        <span class="s2">"kind"</span><span class="p">:</span> <span class="n">channel_kind</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">),</span>
+        <span class="s2">"reason"</span><span class="p">:</span> <span class="n">reason</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_name</span><span class="p">(</span><span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_snowflake</span><span class="p">(</span><span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"id"</span><span class="p">])</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_now</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(</span><span class="n">timespec</span><span class="o">=</span><span class="s2">"seconds"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_empty_summary</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"message_count"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">"first_message_at"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"last_message_at"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"last_message_id"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_drop_partial_last_line</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Cut a file back to its last newline: what an interrupted append leaves behind."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> <span class="ow">or</span> <span class="n">path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"rb+"</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">file</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">SEEK_END</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">file</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">file</span><span class="o">.</span><span class="n">truncate</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_read_json</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> <span class="k">else</span> <span class="p">{}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_json</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Write through a temporary file, so an interrupted run never leaves half a file."""</span>
+    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">temporary</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">with_name</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">".tmp"</span><span class="p">)</span>
+    <span class="n">temporary</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span>
+    <span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">temporary</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

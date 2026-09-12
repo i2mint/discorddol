@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>discorddol.tools &mdash; discorddol 0.0.1 documentation</title>
+  <title>discorddol.tools &mdash; discorddol 0.0.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../_static/documentation_options.js?v=e3a6060d"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/toggleprompt.js?v=d7ede5d2"></script>
@@ -51,13 +51,16 @@
 <li class="toctree-l1"><a class="reference internal" href="../discorddol.html">discorddol</a></li>
 <li class="toctree-l1"><a class="reference internal" href="__main__.html">discorddol.__main__</a></li>
 <li class="toctree-l1"><a class="reference internal" href="base.html">discorddol.base</a></li>
+<li class="toctree-l1"><a class="reference internal" href="export.html">discorddol.export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="local_cache.html">discorddol.local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tests/test_export.html">discorddol.tests.test_export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tests/test_local_cache.html">discorddol.tests.test_local_cache</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tests/test_smoke.html">discorddol.tests.test_smoke</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">discorddol.tools</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.DISPATCH_FUNCS"><code class="docutils literal notranslate"><span class="pre">DISPATCH_FUNCS</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.channels"><code class="docutils literal notranslate"><span class="pre">channels()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.export_channel"><code class="docutils literal notranslate"><span class="pre">export_channel()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.export_guild"><code class="docutils literal notranslate"><span class="pre">export_guild()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.find_deleted_channels"><code class="docutils literal notranslate"><span class="pre">find_deleted_channels()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.guilds"><code class="docutils literal notranslate"><span class="pre">guilds()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#discorddol.tools.messages"><code class="docutils literal notranslate"><span class="pre">messages()</span></code></a></li>
@@ -101,7 +104,7 @@ and gets a clean JSON-ready value back. <code class="docutils literal notranslat
 (<code class="docutils literal notranslate"><span class="pre">DISPATCH_FUNCS</span></code>), so a new verb becomes available on every surface at once.</p>
 <dl class="py data">
 <dt class="sig sig-object py" id="discorddol.tools.DISPATCH_FUNCS">
-<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">DISPATCH_FUNCS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[&lt;function</span> <span class="pre">guilds&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">channels&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">messages&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">transcript&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">export_channel&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">find_deleted_channels&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">recover_attachments&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">post_message&gt;]</span></span><a class="headerlink" href="#discorddol.tools.DISPATCH_FUNCS" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">DISPATCH_FUNCS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[&lt;function</span> <span class="pre">guilds&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">channels&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">messages&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">transcript&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">export_channel&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">export_guild&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">find_deleted_channels&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">recover_attachments&gt;,</span> <span class="pre">&lt;function</span> <span class="pre">post_message&gt;]</span></span><a class="headerlink" href="#discorddol.tools.DISPATCH_FUNCS" title="Link to this definition"></a></dt>
 <dd><p>The SSOT list every surface dispatches over. Add a verb here, get it everywhere.</p>
 </dd></dl>
 
@@ -115,6 +118,22 @@ and gets a clean JSON-ready value back. <code class="docutils literal notranslat
 <dt class="sig sig-object py" id="discorddol.tools.export_channel">
 <span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">export_channel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">guild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'~/Downloads/discord'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#export_channel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.export_channel" title="Link to this definition"></a></dt>
 <dd><p>Export a channel (threads included by default) to a JSON file. Returns a summary.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="discorddol.tools.export_guild">
+<span class="sig-prename descclassname"><span class="pre">discorddol.tools.</span></span><span class="sig-name descname"><span class="pre">export_guild</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">guild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_preflight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quiet</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/discorddol/tools.html#export_guild"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#discorddol.tools.export_guild" title="Link to this definition"></a></dt>
+<dd><p>Export every channel the bot can read in a server, one JSONL file per channel.</p>
+<p>Text and announcement channels, forum posts, and threads (active, archived, and
+private archived ones when the bot has Manage Threads) are exported. Categories,
+voice and stage channels are skipped, and the manifest says why. Re-running on the
+same <code class="docutils literal notranslate"><span class="pre">out_dir</span></code> fetches only new messages, so an interrupted export resumes.</p>
+<p>Before writing anything, recent messages are sampled to check that message bodies
+are not blank, which is what a disabled Message Content Intent looks like;
+<code class="docutils literal notranslate"><span class="pre">skip_preflight</span></code> turns that check off. Only one export at a time may write to a
+folder. <code class="docutils literal notranslate"><span class="pre">out_dir</span></code> defaults to
+<code class="docutils literal notranslate"><span class="pre">exports/&lt;guild</span> <span class="pre">id&gt;</span></code> in discorddol’s data folder. Progress goes to stderr unless
+<code class="docutils literal notranslate"><span class="pre">quiet</span></code>. Returns a summary; the details are in the manifest.</p>
 </dd></dl>
 
 <dl class="py function">

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>&lt;no title&gt; &mdash; discorddol 0.0.1 documentation</title>
+  <title>&lt;no title&gt; &mdash; discorddol 0.0.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
@@ -15,7 +15,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="_static/documentation_options.js?v=e3a6060d"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/toggleprompt.js?v=d7ede5d2"></script>
@@ -50,7 +50,9 @@
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol.html">discorddol</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/__main__.html">discorddol.__main__</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/base.html">discorddol.base</a></li>
+<li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/export.html">discorddol.export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/local_cache.html">discorddol.local_cache</a></li>
+<li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/tests/test_export.html">discorddol.tests.test_export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/tests/test_local_cache.html">discorddol.tests.test_local_cache</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/tests/test_smoke.html">discorddol.tests.test_smoke</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/tools.html">discorddol.tools</a></li>
@@ -85,13 +87,20 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol.html">discorddol</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.CachedAttachments"><code class="docutils literal notranslate"><span class="pre">CachedAttachments</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.ChannelLogs"><code class="docutils literal notranslate"><span class="pre">ChannelLogs</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.Channels"><code class="docutils literal notranslate"><span class="pre">Channels</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.DictBackend"><code class="docutils literal notranslate"><span class="pre">DictBackend</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.DiscordRest"><code class="docutils literal notranslate"><span class="pre">DiscordRest</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.ExportInProgress"><code class="docutils literal notranslate"><span class="pre">ExportInProgress</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.Forbidden"><code class="docutils literal notranslate"><span class="pre">Forbidden</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.Guilds"><code class="docutils literal notranslate"><span class="pre">Guilds</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.MessageContentMissing"><code class="docutils literal notranslate"><span class="pre">MessageContentMissing</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.NotFound"><code class="docutils literal notranslate"><span class="pre">NotFound</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.as_text"><code class="docutils literal notranslate"><span class="pre">as_text()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.cached_channel_ids"><code class="docutils literal notranslate"><span class="pre">cached_channel_ids()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.channel_kind"><code class="docutils literal notranslate"><span class="pre">channel_kind()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.channel_to_dict"><code class="docutils literal notranslate"><span class="pre">channel_to_dict()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.export_guild"><code class="docutils literal notranslate"><span class="pre">export_guild()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.extract_channel_attachments"><code class="docutils literal notranslate"><span class="pre">extract_channel_attachments()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.get_token"><code class="docutils literal notranslate"><span class="pre">get_token()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol.html#discorddol.message_to_dict"><code class="docutils literal notranslate"><span class="pre">message_to_dict()</span></code></a></li>
@@ -103,14 +112,27 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/base.html">discorddol.base</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.CHANNEL_KINDS"><code class="docutils literal notranslate"><span class="pre">CHANNEL_KINDS</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.Channels"><code class="docutils literal notranslate"><span class="pre">Channels</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.DictBackend"><code class="docutils literal notranslate"><span class="pre">DictBackend</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.DiscordRest"><code class="docutils literal notranslate"><span class="pre">DiscordRest</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.Forbidden"><code class="docutils literal notranslate"><span class="pre">Forbidden</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.Guilds"><code class="docutils literal notranslate"><span class="pre">Guilds</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.NotFound"><code class="docutils literal notranslate"><span class="pre">NotFound</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.as_text"><code class="docutils literal notranslate"><span class="pre">as_text()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.channel_kind"><code class="docutils literal notranslate"><span class="pre">channel_kind()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.channel_to_dict"><code class="docutils literal notranslate"><span class="pre">channel_to_dict()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.get_token"><code class="docutils literal notranslate"><span class="pre">get_token()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/base.html#discorddol.base.message_to_dict"><code class="docutils literal notranslate"><span class="pre">message_to_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/export.html">discorddol.export</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/export.html#discorddol.export.ChannelLogs"><code class="docutils literal notranslate"><span class="pre">ChannelLogs</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/export.html#discorddol.export.ExportInProgress"><code class="docutils literal notranslate"><span class="pre">ExportInProgress</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/export.html#discorddol.export.MessageContentMissing"><code class="docutils literal notranslate"><span class="pre">MessageContentMissing</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/export.html#discorddol.export.check_message_content"><code class="docutils literal notranslate"><span class="pre">check_message_content()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/export.html#discorddol.export.default_export_dir"><code class="docutils literal notranslate"><span class="pre">default_export_dir()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/export.html#discorddol.export.export_guild"><code class="docutils literal notranslate"><span class="pre">export_guild()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/local_cache.html">discorddol.local_cache</a><ul>
@@ -122,12 +144,14 @@
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/local_cache.html#discorddol.local_cache.orphan_channel_ids"><code class="docutils literal notranslate"><span class="pre">orphan_channel_ids()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/tests/test_export.html">discorddol.tests.test_export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/tests/test_local_cache.html">discorddol.tests.test_local_cache</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/tests/test_smoke.html">discorddol.tests.test_smoke</a></li>
 <li class="toctree-l1"><a class="reference internal" href="module_docs/discorddol/tools.html">discorddol.tools</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/tools.html#discorddol.tools.DISPATCH_FUNCS"><code class="docutils literal notranslate"><span class="pre">DISPATCH_FUNCS</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/tools.html#discorddol.tools.channels"><code class="docutils literal notranslate"><span class="pre">channels()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/tools.html#discorddol.tools.export_channel"><code class="docutils literal notranslate"><span class="pre">export_channel()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/tools.html#discorddol.tools.export_guild"><code class="docutils literal notranslate"><span class="pre">export_guild()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/tools.html#discorddol.tools.find_deleted_channels"><code class="docutils literal notranslate"><span class="pre">find_deleted_channels()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/tools.html#discorddol.tools.guilds"><code class="docutils literal notranslate"><span class="pre">guilds()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="module_docs/discorddol/tools.html#discorddol.tools.messages"><code class="docutils literal notranslate"><span class="pre">messages()</span></code></a></li>

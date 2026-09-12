@@ -1,0 +1,4 @@
+discorddol.tests.test_export
+============================
+.. automodule:: discorddol.tests.test_export
+   :members:
