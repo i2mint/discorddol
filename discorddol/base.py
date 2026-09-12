@@ -489,9 +489,13 @@ class DictBackend:
         """
 
         def position(message, bound):
-            """Where a message sits, and the bound, in comparable terms."""
+            """Where a message sits, and the bound, in comparable terms.
+
+            A naive datetime is taken as local time, as discord.py takes it.
+            """
             if isinstance(bound, datetime):
-                return datetime.fromisoformat(message["created_at"]), bound
+                created = datetime.fromisoformat(message["created_at"])
+                return created.astimezone(), bound.astimezone()
             return int(message["id"]), int(bound)
 
         found = list(self._messages.get(str(channel_id), ()))

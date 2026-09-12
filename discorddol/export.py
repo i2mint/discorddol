@@ -26,15 +26,17 @@ run at a time may write to a folder; another is refused with :class:`ExportInPro
 
 **Content check.** Without the Message Content intent, Discord still returns every
 message, but with its text, attachments and embeds blanked. An export in that state
-looks like a success and holds nothing, so before anything is written,
-:func:`check_message_content` samples recent messages written by people and refuses to
-go on when most of them are blank. If it finds nothing to judge, the export judges the
-messages it fetches the same way as it goes, and stops as soon as the sample is big
-enough to show they are blank.
+looks like a success and holds nothing. So before anything is written,
+:func:`check_message_content` samples recent messages written by people, a few from
+each channel, and refuses to go on when most of them are blank. Until a full sample has
+been judged, the export goes on judging the messages it fetches in the same way, and
+refuses as soon as they show blank bodies, or at the latest when the run ends. Messages
+written before that point stay on disk, so delete an export refused this way.
 """
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 from collections.abc import Mapping
@@ -74,10 +76,21 @@ SKIP_REASONS = {
 }
 #: Message types a person writes. A system notice (a pin, a join) can be blank anyway.
 REGULAR_MESSAGE_TYPES = frozenset({"default", "reply"})
-#: How many messages written by people the content check judges.
+#: How many messages written by people make a full content-check sample.
 CONTENT_SAMPLE_SIZE = 20
-#: The share of blank messages in that sample above which content counts as missing.
+#: The fewest channels the preflight spreads its sample over, when there are that many.
+CONTENT_SAMPLE_CHANNELS = 4
+#: The share of blank messages in a sample above which content counts as missing.
 MAX_BLANK_SHARE = 0.5
+#: Lock errors that mean another run holds the folder, rather than "cannot lock here".
+_LOCKED_ERRNOS = frozenset(
+    {
+        errno.EAGAIN,
+        errno.EWOULDBLOCK,
+        errno.EACCES,
+        getattr(errno, "EDEADLOCK", errno.EDEADLK),
+    }
+)
 
 
 def default_export_dir(guild_id) -> Path:
@@ -115,28 +128,31 @@ def check_message_content(
     channels: Iterable[dict],
     *,
     sample_size: int = CONTENT_SAMPLE_SIZE,
+    min_channels: int = CONTENT_SAMPLE_CHANNELS,
     max_blank_share: float = MAX_BLANK_SHARE,
 ) -> dict:
     """Refuse to export blank messages: sample recent messages and check their content.
 
     Fetches the newest messages of each channel in ``channels`` (records with an
     ``id``), one call per channel, until ``sample_size`` messages written by people have
-    been seen. System notices and bot messages do not count: a notice can be blank
-    anyway, and a bot's own messages keep their content without the intent. A message
-    is blank when it has no text, no attachments and no embeds, which is how Discord
-    sends every message when the intent is off.
+    been collected. No channel supplies more than ``sample_size // min_channels`` of
+    them, so one channel full of stickers cannot decide the verdict. System notices and
+    bot messages do not count: a notice can be blank anyway, and a bot's own messages
+    keep their content without the intent. A message is blank when it has no text, no
+    attachments and no embeds, which is how Discord sends every message when the intent
+    is off.
 
     Raises :class:`MessageContentMissing`, naming the fix, when more than
-    ``max_blank_share`` of the sample is blank; a few blank messages (a sticker, a poll)
-    do not trip it. Returns ``{'status': 'passed', 'checked', 'blank'}``, or
-    ``{'status': 'inconclusive', 'checked': 0, 'blank': 0}`` when there was nothing to
-    judge.
+    ``max_blank_share`` of the sample is blank. Returns ``{'status': 'passed',
+    'checked', 'blank'}``, or ``{'status': 'inconclusive', 'checked': 0, 'blank': 0}``
+    when there was nothing to judge.
 
     >>> from discorddol.base import DictBackend
     >>> backend = DictBackend(messages={'10': [{'id': '1', 'content': 'hi'}]})
     >>> check_message_content(backend, [{'id': '10'}])
     {'status': 'passed', 'checked': 1, 'blank': 0}
     """
+    per_channel = max(1, sample_size // min_channels)
     sample = []
     for record in channels:
         if len(sample) >= sample_size:
@@ -147,7 +163,8 @@ def check_message_content(
             )
         except (PermissionError, NotFound):
             continue
-        sample.extend((record, message) for message in recent if _is_telling(message))
+        telling = [(record, message) for message in recent if _is_telling(message)]
+        sample.extend(telling[:per_channel])
     return _judge_content(sample[:sample_size], max_blank_share=max_blank_share)
 
 
@@ -290,8 +307,8 @@ def export_guild(
     Returns the manifest, which is also written to ``out_dir``. Re-running on the same
     ``out_dir`` fetches only what is new (see the module docstring).
     ``private_threads=False`` does not ask for private archived threads.
-    ``preflight=False`` skips the content check; ``sample_size`` is how many messages
-    it judges. ``log`` gets one line per channel.
+    ``preflight=False`` turns the content check off; ``sample_size`` is how many
+    messages make a full sample for it. ``log`` gets one line per channel.
 
     >>> import tempfile
     >>> from discorddol.base import DictBackend
@@ -311,6 +328,7 @@ def export_guild(
     """
     backend = _dflt_backend(backend, token)
     out_dir = Path(out_dir).expanduser()
+    log = log or (lambda line: None)
     parents, threads_by_parent, skipped = _plan(backend.channels(guild_id))
     if preflight:
         own_history = [p for p in parents if channel_kind(p) not in NO_HISTORY_KINDS]
@@ -320,7 +338,7 @@ def export_guild(
         )
     else:
         checked = {"status": "skipped"}
-    with _exclusive(out_dir):
+    with _exclusive(out_dir, log=log):
         run = _ExportRun(
             backend,
             out_dir,
@@ -329,7 +347,7 @@ def export_guild(
             skipped=skipped,
             page_size=page_size,
             sample_size=sample_size,
-            log=log or (lambda line: None),
+            log=log,
         )
         for parent in parents:
             run.export_with_threads(
@@ -355,6 +373,10 @@ class _ExportRun:
     time (``skipped`` says why); or, once a run finishes without reaching it,
     ``not in last run``, as for a channel deleted or hidden from the bot since.
     ``skipped`` and ``not_fetched`` describe the latest run only.
+
+    ``run.preflight`` is the verdict before anything was written. When that did not
+    judge a full sample, ``run.content_check`` is the verdict on the messages the export
+    itself fetched.
     """
 
     def __init__(
@@ -376,8 +398,10 @@ class _ExportRun:
         self.sample_size = sample_size
         self.log = log
         self.seen = set()
-        #: While no content check has passed: the messages fetched so far, to judge.
-        self.unjudged = [] if preflight["status"] == "inconclusive" else None
+        #: Fetched messages to judge, until a full sample has been; None when not needed.
+        judged_enough = preflight.get("checked", 0) >= sample_size
+        skipped_check = preflight["status"] == "skipped"
+        self.sample = None if judged_enough or skipped_check else []
         previous = _read_json(self.manifest_path)
         self.entries = {entry["id"]: entry for entry in previous.get("channels", ())}
         earlier_name = previous.get("guild", {}).get("name")
@@ -388,6 +412,7 @@ class _ExportRun:
                 "started_at": _now(),
                 "finished_at": None,
                 "preflight": preflight,
+                "content_check": None,
                 "channels_exported": 0,
                 "new_messages": 0,
             },
@@ -431,6 +456,8 @@ class _ExportRun:
                 self._set_entry(
                     record, status="skipped", summary=summary, parent=parent
                 )
+            elif channel_id in self.entries:  # exported before, file deleted since
+                self._set_entry(record, status="skipped", parent=parent)
             return
         if channel_id not in self.logs:
             self.logs.extend(channel_id, ())  # every exported channel gets a file
@@ -444,16 +471,16 @@ class _ExportRun:
         )
 
     def finish(self) -> dict:
-        """Mark what this run did not reach, stamp it finished, save and return it."""
+        """Mark what this run did not reach, conclude the content check, save, return.
+
+        A content check still open is concluded on whatever sample the run gathered,
+        so a small export whose messages are mostly blank is refused here.
+        """
         for channel_id, entry in self.entries.items():
             if channel_id not in self.seen:
                 entry["status"] = "not in last run"
-        if self.unjudged:
-            self.manifest["run"]["preflight"] = {
-                "status": "inconclusive",
-                "checked": len(self.unjudged),
-                "blank": sum(_is_blank(message) for _, message in self.unjudged),
-            }
+        if self.sample is not None:
+            self._conclude_content_check()
         self.manifest["run"]["finished_at"] = _now()
         self.save()
         return self.manifest
@@ -493,14 +520,27 @@ class _ExportRun:
                 return summary, None
 
     def _judge(self, record: dict, page: list) -> None:
-        """Until a content check has passed, judge fetched messages before writing them."""
-        if self.unjudged is None:
+        """Until a full sample has been judged, judge a fetched page before writing it."""
+        if self.sample is None:
             return
-        self.unjudged.extend((record, m) for m in page if _is_telling(m))
-        if len(self.unjudged) >= self.sample_size:
-            verdict = _judge_content(self.unjudged, max_blank_share=MAX_BLANK_SHARE)
-            self.manifest["run"]["preflight"] = {**verdict, "during": "export"}
-            self.unjudged = None
+        self.sample.extend((record, m) for m in page if _is_telling(m))
+        if len(self.sample) >= self.sample_size:
+            self._conclude_content_check()
+
+    def _conclude_content_check(self) -> None:
+        """Judge the export's own sample and record the verdict, saved before refusing."""
+        sample, self.sample = self.sample, None
+        try:
+            verdict = _judge_content(sample, max_blank_share=MAX_BLANK_SHARE)
+        except MessageContentMissing:
+            self.manifest["run"]["content_check"] = {
+                "status": "failed",
+                "checked": len(sample),
+                "blank": sum(_is_blank(message) for _, message in sample),
+            }
+            self.save()
+            raise
+        self.manifest["run"]["content_check"] = verdict
 
     def _threads_of(self, parent: dict, active_threads, *, private: bool) -> list:
         """A channel's threads: its active ones, plus public and private archived ones."""
@@ -574,8 +614,12 @@ def _plan(listing: Iterable[dict]) -> tuple[list, dict, list]:
 
 
 @contextmanager
-def _exclusive(folder: Path):
-    """Hold an OS lock on ``folder`` for one run. The OS releases it if the run dies."""
+def _exclusive(folder: Path, *, log: Optional[Callable[[str], None]] = None):
+    """Hold an OS lock on ``folder`` for one run. The OS releases it if the run dies.
+
+    A filesystem that cannot lock at all, as some network mounts cannot, does not stop
+    the export: it runs without the lock, and says so through ``log``.
+    """
     folder.mkdir(parents=True, exist_ok=True)
     handle = (folder / LOCK_FILENAME).open("a+b")
     if os.name == "nt":
@@ -599,16 +643,24 @@ def _exclusive(folder: Path):
 
     try:
         lock()
+        locked = True
     except OSError as error:
-        handle.close()
-        raise ExportInProgress(
-            f"Another export is already writing to {folder}. Let it finish, or stop "
-            f"it, then run this one again."
-        ) from error
+        if error.errno in _LOCKED_ERRNOS:
+            handle.close()
+            raise ExportInProgress(
+                f"Another export is already writing to {folder}. Let it finish, or "
+                f"stop it, then run this one again."
+            ) from error
+        locked = False
+        (log or (lambda line: None))(
+            f"could not lock {folder} ({error}); nothing stops a second export from "
+            f"writing to it at the same time"
+        )
     try:
         yield
     finally:
-        unlock()
+        if locked:
+            unlock()
         handle.close()
 
 
