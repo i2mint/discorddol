@@ -93,17 +93,71 @@ def _missing_token_message(key: str) -> str:
 # --------------------------------------------------------------------------------------
 
 
+def _iso(moment) -> Optional[str]:
+    return moment.isoformat() if moment else None
+
+
+def _attachment_to_dict(a) -> dict:
+    return {"filename": a.filename, "url": a.url, "size": a.size, "id": str(a.id)}
+
+
+def _sticker_to_dict(sticker) -> dict:
+    return {
+        "id": str(sticker.id),
+        "name": sticker.name,
+        "format": str(sticker.format),
+        "url": sticker.url,
+    }
+
+
+def _poll_to_dict(poll) -> Optional[dict]:
+    """A poll's question, answers (with vote counts) and settings; ``None`` if no poll."""
+    if poll is None:
+        return None
+    return {
+        "question": poll.question,
+        "answers": [
+            {
+                "id": answer.id,
+                "text": answer.text,
+                "emoji": str(answer.emoji) if answer.emoji else None,
+                "vote_count": answer.vote_count,
+            }
+            for answer in poll.answers
+        ],
+        "multiple": poll.multiple,
+        "expires_at": _iso(poll.expires_at),
+        "finalized": poll.is_finalized(),
+        "total_votes": poll.total_votes,
+    }
+
+
+def _snapshot_to_dict(snapshot) -> dict:
+    """What a forwarded message carried: the original's content, not the forwarder's."""
+    return {
+        "content": snapshot.content,
+        "created_at": _iso(snapshot.created_at),
+        "edited_at": _iso(snapshot.edited_at),
+        "attachments": [_attachment_to_dict(a) for a in snapshot.attachments],
+        "embeds": [e.to_dict() for e in snapshot.embeds],
+        "stickers": [_sticker_to_dict(s) for s in snapshot.stickers],
+        "type": str(snapshot.type),
+    }
+
+
 def message_to_dict(message) -> dict:
-    """Serialize a ``discord.Message`` to a plain, JSON-safe dict."""
+    """Serialize a ``discord.Message`` to a plain, JSON-safe dict.
 
-    def attachment(a):
-        return {"filename": a.filename, "url": a.url, "size": a.size, "id": str(a.id)}
-
+    A message that is only a sticker, a poll or a forward has no text, attachments or
+    embeds of its own, so those live under ``stickers``, ``poll`` (``None`` when the
+    message has none) and ``forwarded`` (one entry per forwarded message, which is how
+    Discord holds a forward: a snapshot of the original).
+    """
     return {
         "id": str(message.id),
         "channel_id": str(message.channel.id),
         "created_at": message.created_at.isoformat(),
-        "edited_at": message.edited_at.isoformat() if message.edited_at else None,
+        "edited_at": _iso(message.edited_at),
         "author": {
             "id": str(message.author.id),
             "name": message.author.name,
@@ -114,8 +168,15 @@ def message_to_dict(message) -> dict:
         },
         "content": message.content,
         "clean_content": message.clean_content,
-        "attachments": [attachment(a) for a in message.attachments],
+        "attachments": [_attachment_to_dict(a) for a in message.attachments],
         "embeds": [e.to_dict() for e in message.embeds],
+        "stickers": [_sticker_to_dict(s) for s in message.stickers],
+        "poll": _poll_to_dict(getattr(message, "poll", None)),
+        # ``message_snapshots`` needs discord.py 2.5; older versions have no forwards.
+        "forwarded": [
+            _snapshot_to_dict(s)
+            for s in getattr(message, "message_snapshots", None) or ()
+        ],
         "reactions": [
             {"emoji": str(r.emoji), "count": r.count} for r in message.reactions
         ],
