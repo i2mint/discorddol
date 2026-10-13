@@ -1,0 +1,38 @@
+discorddol.base
+===============
+
+.. automodule:: discorddol.base
+
+   
+   .. rubric:: Module Attributes
+
+   .. autosummary::
+   
+      CHANNEL_KINDS
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      get_token
+      message_to_dict
+      channel_to_dict
+      channel_kind
+      as_text
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      DiscordRest
+      DictBackend
+      Channels
+      Guilds
+   
+   .. rubric:: Exceptions
+
+   .. autosummary::
+   
+      Forbidden
+      NotFound
+   

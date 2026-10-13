@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "built_at": "2026-10-13T16:13:47Z",
+  "package": {
+    "name": "discorddol",
+    "version": "0.0.3",
+    "display_name": "discorddol",
+    "source": "pyproject.toml"
+  },
+  "git": {
+    "available": true,
+    "commit": "cd8a38e8d6c3a34584817f71173a7fb5ab857766",
+    "short_commit": "cd8a38e",
+    "branch": "main",
+    "tags": [],
+    "dirty": false,
+    "remote_url": "https://github.com/i2mint/discorddol",
+    "commit_url": "https://github.com/i2mint/discorddol/commit/cd8a38e8d6c3a34584817f71173a7fb5ab857766",
+    "error": null
+  },
+  "ci": {
+    "provider": "github",
+    "repository": "i2mint/discorddol",
+    "sha": "cd8a38e8d6c3a34584817f71173a7fb5ab857766",
+    "sha_in_history": true,
+    "ref": "refs/heads/main",
+    "ref_name": "main",
+    "run_id": "38428515620",
+    "run_url": "https://github.com/i2mint/discorddol/actions/runs/38428515620",
+    "server_url": "https://github.com"
+  },
+  "tools": {
+    "epythet": "0.2.17",
+    "sphinx": "9.1.0",
+    "docutils": "0.22.4",
+    "python": "3.12.15"
+  },
+  "config": {
+    "theme": "auto",
+    "html_theme": "sphinxawesome_theme",
+    "accent": "#6f3f8c",
+    "mode": "auto",
+    "api_generator": "autosummary",
+    "ignore": [
+      "tests/",
+      "scrap/",
+      "examples/"
+    ],
+    "agent_outputs": true,
+    "aggregates": [
+      "md"
+    ],
+    "ai_artifacts": true,
+    "provenance": true,
+    "docs_dir": "docsrc"
+  },
+  "site": {
+    "modules_documented": 5,
+    "objects_documented": 79
+  },
+  "pypi": {
+    "checked": true,
+    "latest": "0.0.4",
+    "relation": "behind",
+    "error": null
+  },
+  "reproduce": "git clone https://github.com/i2mint/discorddol && cd discorddol\ngit checkout cd8a38e8d6c3a34584817f71173a7fb5ab857766\npip install \"epythet==0.2.17\"\nepythet quickstart . --ignore tests/ scrap/ examples/",
+  "warnings": [],
+  "alignment": {
+    "aligned": false,
+    "notes": [
+      "The documented version (0.0.3) is behind the latest release on PyPI (0.0.4): `pip install discorddol` gives newer code than these docs describe."
+    ]
+  }
+}

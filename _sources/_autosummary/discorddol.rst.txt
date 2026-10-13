@@ -1,0 +1,50 @@
+﻿discorddol
+==========
+
+.. automodule:: discorddol
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      as_text
+      get_token
+      message_to_dict
+      channel_to_dict
+      channel_kind
+      export_guild
+      cached_channel_ids
+      orphan_channel_ids
+      extract_channel_attachments
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      Guilds
+      Channels
+      DiscordRest
+      DictBackend
+      ChannelLogs
+      CachedAttachments
+   
+   .. rubric:: Exceptions
+
+   .. autosummary::
+   
+      Forbidden
+      NotFound
+      MessageContentMissing
+      ExportInProgress
+   
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   base
+   export
+   local_cache
+   tools

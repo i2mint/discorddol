@@ -1,0 +1,23 @@
+# discorddol
+
+> Discord data object layers: read guilds, channels, threads and messages as Mappings
+
+
+## Pages
+
+- [discorddol](index.html.md): Read a Discord server the way you read a dict.
+- [API reference](api.html.md): | &#96;discorddol&#96;   | Discord data object layers: read guilds, channels, threads and messages as Mappin...
+- [discorddol](_autosummary/discorddol.html.md): Discord data object layers: read guilds, channels, threads and messages as Mappings.
+- [discorddol.base](_autosummary/discorddol.base.html.md): Core of discorddol: a Discord read backend and the &#96;Mapping&#96; stores over it.
+- [discorddol.export](_autosummary/discorddol.export.html.md): Export a whole guild to disk: every channel the bot can read, one JSONL file each.
+- [discorddol.local_cache](_autosummary/discorddol.local_cache.html.md): Read the Discord desktop client’s on-disk HTTP cache – including for deleted channels.
+- [discorddol.tools](_autosummary/discorddol.tools.html.md): SSOT verb list for discorddol: plain functions, JSON-able in, JSON-able out.
+- [About this build](about-this-build.html.md): This documentation was built on &#42;&#42;2026-10-13 16:13 UTC&#42;&#42; from commit &lt;a href="https://github.com/i2m...
+
+## Optional
+
+- [discorddol.md](discorddol.md): Complete documentation in a single file.
+
+## Build
+
+- [build_info.json](build_info.json): build provenance (commit, version, tool versions, whether the docs match the package)

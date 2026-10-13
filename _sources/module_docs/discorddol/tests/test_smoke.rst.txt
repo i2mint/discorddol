@@ -1,4 +1,0 @@
-discorddol.tests.test_smoke
-===========================
-.. automodule:: discorddol.tests.test_smoke
-   :members:

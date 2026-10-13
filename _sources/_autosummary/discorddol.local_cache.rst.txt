@@ -1,0 +1,22 @@
+discorddol.local\_cache
+=======================
+
+.. automodule:: discorddol.local_cache
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      discord_cache_dir
+      cached_attachment_refs
+      cached_channel_ids
+      orphan_channel_ids
+      extract_channel_attachments
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      CachedAttachments
+   

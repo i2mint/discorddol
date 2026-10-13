@@ -1,0 +1,26 @@
+discorddol.tools
+================
+
+.. automodule:: discorddol.tools
+
+   
+   .. rubric:: Module Attributes
+
+   .. autosummary::
+   
+      DISPATCH_FUNCS
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      guilds
+      channels
+      messages
+      transcript
+      export_channel
+      export_guild
+      find_deleted_channels
+      recover_attachments
+      post_message
+   

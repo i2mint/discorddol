@@ -1,4 +1,0 @@
-discorddol.base
-===============
-.. automodule:: discorddol.base
-   :members:
