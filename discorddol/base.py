@@ -859,6 +859,20 @@ class Guilds(Mapping):
 # --------------------------------------------------------------------------------------
 
 
+def _extras_lines(m) -> list[str]:
+    """One-line forms of what a message carries beyond text: attachments, stickers, poll, forwards."""
+    lines = [f"[attachment: {a['filename']}]" for a in m.get("attachments") or ()]
+    lines += [f"[sticker: {s['name']}]" for s in m.get("stickers") or ()]
+    if poll := m.get("poll"):
+        answers = " | ".join(a["text"] for a in poll.get("answers") or ())
+        lines.append(f"[poll: {poll['question']} -- {answers}]")
+    for fwd in m.get("forwarded") or ():
+        content = " ".join((fwd.get("content") or "").split())
+        extras = " ".join(_extras_lines(fwd))
+        lines.append(f"[forwarded: {' '.join(filter(None, (content, extras)))}]")
+    return lines
+
+
 def as_text(messages, *, with_timestamps: bool = True) -> str:
     """Render message dicts as a readable transcript -- the form you feed to an LLM.
 
@@ -866,14 +880,26 @@ def as_text(messages, *, with_timestamps: bool = True) -> str:
     ...                 'author': {'display_name': 'ada'},
     ...                 'clean_content': 'hello'}]))
     [2026-09-04T10:00] ada: hello
+
+    Stickers, polls and forwards each get a one-line form, so a message made only of
+    one of them is not blank:
+
+    >>> print(as_text([{'author': {'display_name': 'ada'}, 'stickers': [{'name': 'wave'}],
+    ...                 'poll': {'question': 'Lunch?', 'answers': [{'text': 'yes'}, {'text': 'no'}]},
+    ...                 'forwarded': [{'content': 'original text'}]}],
+    ...               with_timestamps=False))
+    ada:
+        [sticker: wave]
+        [poll: Lunch? -- yes | no]
+        [forwarded: original text]
     """
 
     def line(m):
         who = (m.get("author") or {}).get("display_name", "?")
         body = m.get("clean_content") or m.get("content") or ""
-        for a in m.get("attachments", ()):
-            body += f"\n    [attachment: {a['filename']}]"
+        for extra in _extras_lines(m):
+            body += f"\n    {extra}"
         stamp = f"[{(m.get('created_at') or '')[:16]}] " if with_timestamps else ""
-        return f"{stamp}{who}: {body}"
+        return f"{stamp}{who}:{'' if body.startswith(chr(10)) else ' '}{body}"
 
     return "\n".join(map(line, messages))
