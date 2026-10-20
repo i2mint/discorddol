@@ -329,6 +329,20 @@ Render message dicts as a readable transcript – the form you feed to an LLM.
 [2026-09-04T10:00] ada: hello
 ```
 
+Stickers, polls and forwards each get a one-line form, so a message made only of
+one of them is not blank:
+
+```pycon
+>>> print(as_text([{'author': {'display_name': 'ada'}, 'stickers': [{'name': 'wave'}],
+...                 'poll': {'question': 'Lunch?', 'answers': [{'text': 'yes'}, {'text': 'no'}]},
+...                 'forwarded': [{'content': 'original text'}]}],
+...               with_timestamps=False))
+ada:
+    [sticker: wave]
+    [poll: Lunch? -- yes | no]
+    [forwarded: original text]
+```
+
 * **Return type:**
   [`str`](https://docs.python.org/3/builtins/stdtypes.html#str)
 

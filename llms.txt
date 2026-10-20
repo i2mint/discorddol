@@ -12,7 +12,7 @@
 - [discorddol.export](_autosummary/discorddol.export.html.md): Export a whole guild to disk: every channel the bot can read, one JSONL file each.
 - [discorddol.local_cache](_autosummary/discorddol.local_cache.html.md): Read the Discord desktop client’s on-disk HTTP cache – including for deleted channels.
 - [discorddol.tools](_autosummary/discorddol.tools.html.md): SSOT verb list for discorddol: plain functions, JSON-able in, JSON-able out.
-- [About this build](about-this-build.html.md): This documentation was built on &#42;&#42;2026-10-20 02:51 UTC&#42;&#42; from commit &lt;a href="https://github.com/i2m...
+- [About this build](about-this-build.html.md): This documentation was built on &#42;&#42;2026-10-20 10:03 UTC&#42;&#42; from commit &lt;a href="https://github.com/i2m...
 
 ## Optional
 

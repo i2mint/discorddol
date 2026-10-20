@@ -436,6 +436,18 @@ mentions, so relaying quoted text cannot ping a whole server.</p></li>
 </span><span id="line-4"><span class="go">[2026-09-04T10:00] ada: hello</span>
 </span></code></pre></div>
 </div>
+<p>Stickers, polls and forwards each get a one-line form, so a message made only of
+one of them is not blank:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><code><span id="line-1"><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">as_text</span><span class="p">([{</span><span class="s1">'author'</span><span class="p">:</span> <span class="p">{</span><span class="s1">'display_name'</span><span class="p">:</span> <span class="s1">'ada'</span><span class="p">},</span> <span class="s1">'stickers'</span><span class="p">:</span> <span class="p">[{</span><span class="s1">'name'</span><span class="p">:</span> <span class="s1">'wave'</span><span class="p">}],</span>
+</span><span id="line-2"><span class="gp">... </span>                <span class="s1">'poll'</span><span class="p">:</span> <span class="p">{</span><span class="s1">'question'</span><span class="p">:</span> <span class="s1">'Lunch?'</span><span class="p">,</span> <span class="s1">'answers'</span><span class="p">:</span> <span class="p">[{</span><span class="s1">'text'</span><span class="p">:</span> <span class="s1">'yes'</span><span class="p">},</span> <span class="p">{</span><span class="s1">'text'</span><span class="p">:</span> <span class="s1">'no'</span><span class="p">}]},</span>
+</span><span id="line-3"><span class="gp">... </span>                <span class="s1">'forwarded'</span><span class="p">:</span> <span class="p">[{</span><span class="s1">'content'</span><span class="p">:</span> <span class="s1">'original text'</span><span class="p">}]}],</span>
+</span><span id="line-4"><span class="gp">... </span>              <span class="n">with_timestamps</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+</span><span id="line-5"><span class="go">ada:</span>
+</span><span id="line-6"><span class="go">    [sticker: wave]</span>
+</span><span id="line-7"><span class="go">    [poll: Lunch? -- yes | no]</span>
+</span><span id="line-8"><span class="go">    [forwarded: original text]</span>
+</span></code></pre></div>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" rel="nofollow noopener" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code><svg fill="currentColor" height="1em" stroke="none" viewbox="0 96 960 960" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M188 868q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360 336q0-17 11.5-28.5T400 296h320q17 0 28.5 11.5T760 336v320q0 17-11.5 28.5T720 696q-17 0-28.5-11.5T680 656V432L244 868q-11 11-28 11t-28-11Z"></path></svg></a></span></p>
@@ -543,7 +555,7 @@ Discord holds a forward: a snapshot of the original).</p>
 </div>
 </footer>
 </div>
-<script src="../_static/documentation_options.js?v=8c5712d9"></script>
+<script src="../_static/documentation_options.js?v=282f96c0"></script>
 <script src="../_static/doctools.js?v=fd6eb6e6"></script>
 <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
 <script src="../_static/clipboard.min.js?v=a7894cd8"></script>

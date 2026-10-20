@@ -1,4 +1,4 @@
-> built 2026-10-20 02:51 UTC from 25bf5e6 (main) · discorddol 0.0.4. Details: build_info.json
+> built 2026-10-20 10:03 UTC from 6d15d49 (main) · discorddol 0.0.5. Details: build_info.json
 
 # index.html.md
 
@@ -461,6 +461,20 @@ Render message dicts as a readable transcript – the form you feed to an LLM.
 ...                 'author': {'display_name': 'ada'},
 ...                 'clean_content': 'hello'}]))
 [2026-09-04T10:00] ada: hello
+```
+
+Stickers, polls and forwards each get a one-line form, so a message made only of
+one of them is not blank:
+
+```pycon
+>>> print(as_text([{'author': {'display_name': 'ada'}, 'stickers': [{'name': 'wave'}],
+...                 'poll': {'question': 'Lunch?', 'answers': [{'text': 'yes'}, {'text': 'no'}]},
+...                 'forwarded': [{'content': 'original text'}]}],
+...               with_timestamps=False))
+ada:
+    [sticker: wave]
+    [poll: Lunch? -- yes | no]
+    [forwarded: original text]
 ```
 
 * **Return type:**
@@ -1033,6 +1047,20 @@ Render message dicts as a readable transcript – the form you feed to an LLM.
 [2026-09-04T10:00] ada: hello
 ```
 
+Stickers, polls and forwards each get a one-line form, so a message made only of
+one of them is not blank:
+
+```pycon
+>>> print(as_text([{'author': {'display_name': 'ada'}, 'stickers': [{'name': 'wave'}],
+...                 'poll': {'question': 'Lunch?', 'answers': [{'text': 'yes'}, {'text': 'no'}]},
+...                 'forwarded': [{'content': 'original text'}]}],
+...               with_timestamps=False))
+ada:
+    [sticker: wave]
+    [poll: Lunch? -- yes | no]
+    [forwarded: original text]
+```
+
 * **Return type:**
   [`str`](https://docs.python.org/3/builtins/stdtypes.html#str)
 
@@ -1428,18 +1456,16 @@ Render a channel as readable transcript text – the form to feed an LLM.
 
 # About this build
 
-This documentation was built on **2026-10-20 02:51 UTC** from commit <a href="https://github.com/i2mint/discorddol/commit/25bf5e6dcd55467138d8e370445e343df90ebf9e"><code>25bf5e6</code></a> on branch <code>main</code>, for **discorddol 0.0.4** (from <code>pyproject.toml</code>).
+This documentation was built on **2026-10-20 10:03 UTC** from commit <a href="https://github.com/i2mint/discorddol/commit/6d15d499357441ab3e71cffe9133f5d978c6e061"><code>6d15d49</code></a> on branch <code>main</code>, for **discorddol 0.0.5** (from <code>pyproject.toml</code>).
 
-#### WARNING
-The documentation and the package may be misaligned:
-
-- The documented version (0.0.4) is behind the latest release on PyPI (0.0.5): `pip install discorddol` gives newer code than these docs describe.
+#### NOTE
+Nothing suggests a mismatch: the tree was clean at the commit above, and the documented version is the one on PyPI.
 
 ## Source
 
 |                     |                                                                                                                                                          |
 |---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Commit              | <a href="https://github.com/i2mint/discorddol/commit/25bf5e6dcd55467138d8e370445e343df90ebf9e"><code>25bf5e6dcd55467138d8e370445e343df90ebf9e</code></a> |
+| Commit              | <a href="https://github.com/i2mint/discorddol/commit/6d15d499357441ab3e71cffe9133f5d978c6e061"><code>6d15d499357441ab3e71cffe9133f5d978c6e061</code></a> |
 | Branch              | <code>main</code>                                                                                                                                        |
 | Tags at this commit | none                                                                                                                                                     |
 | Working tree        | clean                                                                                                                                                    |
@@ -1450,9 +1476,9 @@ The documentation and the package may be misaligned:
 |              |                                                                                            |
 |--------------|--------------------------------------------------------------------------------------------|
 | Repository   | <code>i2mint/discorddol</code>                                                             |
-| Run          | <a href="https://github.com/i2mint/discorddol/actions/runs/39361023543">39361023543</a>    |
+| Run          | <a href="https://github.com/i2mint/discorddol/actions/runs/39404970548">39404970548</a>    |
 | Ref          | <code>refs/heads/main</code>                                                               |
-| Event commit | <code>25bf5e6dcd55467138d8e370445e343df90ebf9e</code> (in the history of the built commit) |
+| Event commit | <code>6d15d499357441ab3e71cffe9133f5d978c6e061</code> (in the history of the built commit) |
 
 ## Tools
 
@@ -1477,13 +1503,13 @@ The documentation and the package may be misaligned:
 
 ## Package on PyPI
 
-Latest release: <a href="https://pypi.org/project/discorddol/0.0.5/">0.0.5</a>, newer than the documented version (0.0.4).
+Latest release: <a href="https://pypi.org/project/discorddol/0.0.5/">0.0.5</a>, the same as the documented version.
 
 ## Reproduce
 
 ```bash
 git clone https://github.com/i2mint/discorddol && cd discorddol
-git checkout 25bf5e6dcd55467138d8e370445e343df90ebf9e
+git checkout 6d15d499357441ab3e71cffe9133f5d978c6e061
 pip install "epythet==0.2.18"
 epythet quickstart . --ignore tests/ scrap/ examples/
 ```

@@ -1,32 +1,32 @@
 {
   "schema_version": 1,
-  "built_at": "2026-10-20T02:51:29Z",
+  "built_at": "2026-10-20T10:03:26Z",
   "package": {
     "name": "discorddol",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "display_name": "discorddol",
     "source": "pyproject.toml"
   },
   "git": {
     "available": true,
-    "commit": "25bf5e6dcd55467138d8e370445e343df90ebf9e",
-    "short_commit": "25bf5e6",
+    "commit": "6d15d499357441ab3e71cffe9133f5d978c6e061",
+    "short_commit": "6d15d49",
     "branch": "main",
     "tags": [],
     "dirty": false,
     "remote_url": "https://github.com/i2mint/discorddol",
-    "commit_url": "https://github.com/i2mint/discorddol/commit/25bf5e6dcd55467138d8e370445e343df90ebf9e",
+    "commit_url": "https://github.com/i2mint/discorddol/commit/6d15d499357441ab3e71cffe9133f5d978c6e061",
     "error": null
   },
   "ci": {
     "provider": "github",
     "repository": "i2mint/discorddol",
-    "sha": "25bf5e6dcd55467138d8e370445e343df90ebf9e",
+    "sha": "6d15d499357441ab3e71cffe9133f5d978c6e061",
     "sha_in_history": true,
     "ref": "refs/heads/main",
     "ref_name": "main",
-    "run_id": "39361023543",
-    "run_url": "https://github.com/i2mint/discorddol/actions/runs/39361023543",
+    "run_id": "39404970548",
+    "run_url": "https://github.com/i2mint/discorddol/actions/runs/39404970548",
     "server_url": "https://github.com"
   },
   "tools": {
@@ -61,15 +61,13 @@
   "pypi": {
     "checked": true,
     "latest": "0.0.5",
-    "relation": "behind",
+    "relation": "same",
     "error": null
   },
-  "reproduce": "git clone https://github.com/i2mint/discorddol && cd discorddol\ngit checkout 25bf5e6dcd55467138d8e370445e343df90ebf9e\npip install \"epythet==0.2.18\"\nepythet quickstart . --ignore tests/ scrap/ examples/",
+  "reproduce": "git clone https://github.com/i2mint/discorddol && cd discorddol\ngit checkout 6d15d499357441ab3e71cffe9133f5d978c6e061\npip install \"epythet==0.2.18\"\nepythet quickstart . --ignore tests/ scrap/ examples/",
   "warnings": [],
   "alignment": {
-    "aligned": false,
-    "notes": [
-      "The documented version (0.0.4) is behind the latest release on PyPI (0.0.5): `pip install discorddol` gives newer code than these docs describe."
-    ]
+    "aligned": true,
+    "notes": []
   }
 }
