@@ -23,7 +23,7 @@ and gets a clean JSON-ready value back. `__main__.py` builds the CLI off the sam
 | [`export_guild`](#discorddol.tools.export_guild)(guild, \*[, out_dir, token, ...])     | Export every channel the bot can read in a server, one JSONL file per channel. |
 | [`find_deleted_channels`](#discorddol.tools.find_deleted_channels)(guild, \*[, token, ...])     | Find channel ids cached on this machine that no longer exist in a server.      |
 | [`recover_attachments`](#discorddol.tools.recover_attachments)(channel_id, \*[, ...])         | Write out every attachment this machine cached for a channel, deleted or not.  |
-| [`post_message`](#discorddol.tools.post_message)(channel_id, text, \*[, token])        | Post a message to a channel.                                                   |
+| [`post_message`](#discorddol.tools.post_message)(channel_id, text, \*[, token, ...])   | Post a message to a channel.                                                   |
 
 ### discorddol.tools.DISPATCH_FUNCS *= [<function guilds>, <function channels>, <function messages>, <function transcript>, <function export_channel>, <function export_guild>, <function find_deleted_channels>, <function recover_attachments>, <function post_message>]*
 
@@ -90,9 +90,13 @@ Fetch a channel’s messages as dicts. `limit=None` fetches the whole history.
 * **Return type:**
   [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
 
-### discorddol.tools.post_message(channel_id, text, , token=None)
+### discorddol.tools.post_message(channel_id, text, , token=None, allowed_mentions=None, reply_to=None)
 
 Post a message to a channel. Requires the bot to have Send Messages.
+
+`@everyone`, `@here` and role mentions are not turned into pings unless
+`allowed_mentions` (a dict, see `DiscordRest.send_message`) says so;
+`reply_to` is the id of a message to answer.
 
 * **Return type:**
   [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)

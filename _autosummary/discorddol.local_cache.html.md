@@ -77,13 +77,13 @@ one you actually spent time in.
 
 Default Discord desktop cache directory for this platform.
 
-* **Return type:**
-  [`Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
-
 ```pycon
 >>> isinstance(discord_cache_dir(), Path)
 True
 ```
+
+* **Return type:**
+  [`Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 ### discorddol.local_cache.extract_channel_attachments(channel_id, , out_dir, cache_dir=None)
 
@@ -110,9 +110,6 @@ covers deleted channels, but also channels in other servers and channels the bot
 lacks permission to see. Cross-check a candidate against
 [`extract_channel_attachments()`](#discorddol.local_cache.extract_channel_attachments) output before concluding anything.
 
-* **Return type:**
-  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
-
 ```pycon
 >>> import tempfile
 >>> from discorddol.base import DictBackend
@@ -122,3 +119,6 @@ lacks permission to see. Cross-check a candidate against
 >>> sorted(result)
 ['live', 'orphans']
 ```
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)

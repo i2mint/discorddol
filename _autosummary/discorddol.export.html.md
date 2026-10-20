@@ -128,15 +128,15 @@ Raises [`MessageContentMissing`](#discorddol.export.MessageContentMissing), nami
 'checked', 'blank'}`, or `{'status': 'inconclusive', 'checked': 0, 'blank': 0}`
 when there was nothing to judge.
 
-* **Return type:**
-  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
-
 ```pycon
 >>> from discorddol.base import DictBackend
 >>> backend = DictBackend(messages={'10': [{'id': '1', 'content': 'hi'}]})
 >>> check_message_content(backend, [{'id': '10'}])
 {'status': 'passed', 'checked': 1, 'blank': 0}
 ```
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
 
 ### discorddol.export.default_export_dir(guild_id)
 
@@ -159,9 +159,6 @@ Returns the manifest, which is also written to `out_dir`. Re-running on the same
 `preflight=False` turns the content check off; `sample_size` is how many
 messages make a full sample for it. `log` gets one line per channel.
 
-* **Return type:**
-  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
-
 ```pycon
 >>> import tempfile
 >>> from discorddol.base import DictBackend
@@ -179,3 +176,6 @@ messages make a full sample for it. `log` gets one line per channel.
 >>> [(s['name'], s['reason']) for s in manifest['skipped']]
 [('Community', 'category: it groups other channels and holds no messages')]
 ```
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)

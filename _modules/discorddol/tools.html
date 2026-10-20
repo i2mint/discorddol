@@ -30,6 +30,7 @@
   <meta name="twitter:title" content="discorddol.tools | discorddol" />
   <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d75fae25" />
   <link rel="stylesheet" type="text/css" href="../../_static/theme.css?v=d6d7c91b" />
+  <link rel="stylesheet" type="text/css" href="../../_static/sphinx_autodoc_typehints.css?v=057ac668" />
   <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
   <link rel="stylesheet" type="text/css" href="../../_static/epythet.css?v=b644f836" />
   <link rel="search" title="Search" href="../../search.html" />
@@ -373,24 +374,38 @@
 </span><span id="line-184">
 <div class="viewcode-block" id="post_message">
 <a class="viewcode-back" href="../../_autosummary/discorddol.tools.html#discorddol.tools.post_message">[docs]</a>
-</span><span id="line-185"><span class="k">def</span><span class="w"> </span><span class="nf">post_message</span><span class="p">(</span><span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-</span><span id="line-186"><span class="w">    </span><span class="sd">"""Post a message to a channel. Requires the bot to have Send Messages."""</span>
-</span><span id="line-187">    <span class="k">return</span> <span class="n">DiscordRest</span><span class="p">(</span><span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span><span class="o">.</span><span class="n">send_message</span><span class="p">(</span><span class="n">channel_id</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span></div>
+</span><span id="line-185"><span class="k">def</span><span class="w"> </span><span class="nf">post_message</span><span class="p">(</span>
+</span><span id="line-186">    <span class="n">channel_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="line-187">    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="line-188">    <span class="o">*</span><span class="p">,</span>
+</span><span id="line-189">    <span class="n">token</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="line-190">    <span class="n">allowed_mentions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="line-191">    <span class="n">reply_to</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="line-192"><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+</span><span id="line-193"><span class="w">    </span><span class="sd">"""Post a message to a channel. Requires the bot to have Send Messages.</span>
+</span><span id="line-194">
+</span><span id="line-195"><span class="sd">    ``@everyone``, ``@here`` and role mentions are not turned into pings unless</span>
+</span><span id="line-196"><span class="sd">    ``allowed_mentions`` (a dict, see ``DiscordRest.send_message``) says so;</span>
+</span><span id="line-197"><span class="sd">    ``reply_to`` is the id of a message to answer.</span>
+</span><span id="line-198"><span class="sd">    """</span>
+</span><span id="line-199">    <span class="k">return</span> <span class="n">DiscordRest</span><span class="p">(</span><span class="n">token</span><span class="o">=</span><span class="n">token</span><span class="p">)</span><span class="o">.</span><span class="n">send_message</span><span class="p">(</span>
+</span><span id="line-200">        <span class="n">channel_id</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">allowed_mentions</span><span class="o">=</span><span class="n">allowed_mentions</span><span class="p">,</span> <span class="n">reply_to</span><span class="o">=</span><span class="n">reply_to</span>
+</span><span id="line-201">    <span class="p">)</span></div>
 
-</span><span id="line-188">
-</span><span id="line-189">
-</span><span id="line-190"><span class="c1">#: The SSOT list every surface dispatches over. Add a verb here, get it everywhere.</span>
-</span><span id="line-191"><span class="n">DISPATCH_FUNCS</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="line-192">    <span class="n">guilds</span><span class="p">,</span>
-</span><span id="line-193">    <span class="n">channels</span><span class="p">,</span>
-</span><span id="line-194">    <span class="n">messages</span><span class="p">,</span>
-</span><span id="line-195">    <span class="n">transcript</span><span class="p">,</span>
-</span><span id="line-196">    <span class="n">export_channel</span><span class="p">,</span>
-</span><span id="line-197">    <span class="n">export_guild</span><span class="p">,</span>
-</span><span id="line-198">    <span class="n">find_deleted_channels</span><span class="p">,</span>
-</span><span id="line-199">    <span class="n">recover_attachments</span><span class="p">,</span>
-</span><span id="line-200">    <span class="n">post_message</span><span class="p">,</span>
-</span><span id="line-201"><span class="p">]</span>
+</span><span id="line-202">
+</span><span id="line-203">
+</span><span id="line-204"><span class="c1">#: The SSOT list every surface dispatches over. Add a verb here, get it everywhere.</span>
+</span><span id="line-205"><span class="n">DISPATCH_FUNCS</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="line-206">    <span class="n">guilds</span><span class="p">,</span>
+</span><span id="line-207">    <span class="n">channels</span><span class="p">,</span>
+</span><span id="line-208">    <span class="n">messages</span><span class="p">,</span>
+</span><span id="line-209">    <span class="n">transcript</span><span class="p">,</span>
+</span><span id="line-210">    <span class="n">export_channel</span><span class="p">,</span>
+</span><span id="line-211">    <span class="n">export_guild</span><span class="p">,</span>
+</span><span id="line-212">    <span class="n">find_deleted_channels</span><span class="p">,</span>
+</span><span id="line-213">    <span class="n">recover_attachments</span><span class="p">,</span>
+</span><span id="line-214">    <span class="n">post_message</span><span class="p">,</span>
+</span><span id="line-215"><span class="p">]</span>
 </span></code></pre></div>
     </div></div>
           </main>
@@ -404,7 +419,7 @@
 </footer>
     </div>
     
-    <script src="../../_static/documentation_options.js?v=47de8214"></script>
+    <script src="../../_static/documentation_options.js?v=8c5712d9"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>

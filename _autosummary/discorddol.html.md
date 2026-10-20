@@ -163,9 +163,6 @@ In-memory backend over plain dicts. Real enough for tests, fixtures and exports.
 
 The threads under `channel_id` marked `archived`: public, or private ones.
 
-* **Return type:**
-  [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
-
 ```pycon
 >>> backend = DictBackend(threads={'10': [
 ...     {'id': '20', 'type': 'public_thread', 'archived': True},
@@ -178,6 +175,9 @@ The threads under `channel_id` marked `archived`: public, or private ones.
 ['21']
 ```
 
+* **Return type:**
+  [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
+
 #### messages(channel_id, , limit=None, after=None, before=None, oldest_first=True, \*\*kwargs)
 
 Stored messages, filtered the way [`DiscordRest.messages()`](#discorddol.DiscordRest.messages) filters them.
@@ -186,9 +186,6 @@ Messages are stored oldest first. `after` and `before` take a message id,
 compared as a Discord snowflake (an integer), or a datetime, compared with each
 message’s `created_at`. Other keyword arguments are accepted and ignored.
 
-* **Return type:**
-  [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
-
 ```pycon
 >>> backend = DictBackend(messages={'10': [{'id': '1'}, {'id': '2'}, {'id': '3'}]})
 >>> [m['id'] for m in backend.messages('10', after='1', limit=1)]
@@ -196,6 +193,9 @@ message’s `created_at`. Other keyword arguments are accepted and ignored.
 >>> [m['id'] for m in backend.messages('10', oldest_first=False, limit=1)]
 ['3']
 ```
+
+* **Return type:**
+  [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
 
 ### *class* discorddol.DiscordRest(\*, token=None, message_to_dict=<function message_to_dict>)
 
@@ -244,13 +244,21 @@ message already stored works as a cursor.
 * **Return type:**
   [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
 
-#### send_message(channel_id, text)
+#### send_message(channel_id, text, , allowed_mentions=None, reply_to=None)
 
 Post a message to a channel. The one write operation; needs Send Messages.
 
 Read access is what discorddol is for – this exists so that acting on what you
 read does not require a second library.
 
+* **Parameters:**
+  * **allowed_mentions** ([`Any`](https://docs.python.org/3/library/typing.html#typing.Any)) – which mentions in `text` Discord may turn into pings: a
+    `discord.AllowedMentions` or a dict such as
+    `{"everyone": False, "roles": False, "users": ["123"]}` (`users` and
+    `roles` take `True`/`False` or a list of ids). The default,
+    `DFLT_ALLOWED_MENTIONS`, blocks `@everyone`, `@here` and role
+    mentions, so relaying quoted text cannot ping a whole server.
+  * **reply_to** ([`Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)[[`str`](https://docs.python.org/3/builtins/stdtypes.html#str)]) – id of a message in this channel to answer (a Discord reply).
 * **Return type:**
   [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
 
@@ -314,15 +322,15 @@ Discord has no such object (HTTP 404), or does not show it to the bot.
 
 Render message dicts as a readable transcript – the form you feed to an LLM.
 
-* **Return type:**
-  [`str`](https://docs.python.org/3/builtins/stdtypes.html#str)
-
 ```pycon
 >>> print(as_text([{'created_at': '2026-09-04T10:00:00',
 ...                 'author': {'display_name': 'ada'},
 ...                 'clean_content': 'hello'}]))
 [2026-09-04T10:00] ada: hello
 ```
+
+* **Return type:**
+  [`str`](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 ### discorddol.cached_channel_ids(, cache_dir=None)
 
@@ -341,9 +349,6 @@ The kind of a channel record: `'text'`, `'announcement'`, `'forum'`, …
 A record without a type counts as a text channel, which is what a hand-written
 fixture usually means. An unknown type comes back as it is.
 
-* **Return type:**
-  [`str`](https://docs.python.org/3/builtins/stdtypes.html#str)
-
 ```pycon
 >>> channel_kind({'type': 'news'})
 'announcement'
@@ -352,6 +357,9 @@ fixture usually means. An unknown type comes back as it is.
 >>> channel_kind({'id': '10'})
 'text'
 ```
+
+* **Return type:**
+  [`str`](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 ### discorddol.channel_to_dict(channel)
 
@@ -370,9 +378,6 @@ Returns the manifest, which is also written to `out_dir`. Re-running on the same
 `preflight=False` turns the content check off; `sample_size` is how many
 messages make a full sample for it. `log` gets one line per channel.
 
-* **Return type:**
-  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
-
 ```pycon
 >>> import tempfile
 >>> from discorddol.base import DictBackend
@@ -390,6 +395,9 @@ messages make a full sample for it. `log` gets one line per channel.
 >>> [(s['name'], s['reason']) for s in manifest['skipped']]
 [('Community', 'category: it groups other channels and holds no messages')]
 ```
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
 
 ### discorddol.extract_channel_attachments(channel_id, , out_dir, cache_dir=None)
 
@@ -438,9 +446,6 @@ covers deleted channels, but also channels in other servers and channels the bot
 lacks permission to see. Cross-check a candidate against
 [`extract_channel_attachments()`](#discorddol.extract_channel_attachments) output before concluding anything.
 
-* **Return type:**
-  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
-
 ```pycon
 >>> import tempfile
 >>> from discorddol.base import DictBackend
@@ -450,6 +455,9 @@ lacks permission to see. Cross-check a candidate against
 >>> sorted(result)
 ['live', 'orphans']
 ```
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
 
 ### Modules
 
