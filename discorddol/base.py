@@ -145,6 +145,22 @@ def _snapshot_to_dict(snapshot) -> dict:
     }
 
 
+def _author_role_ids(author) -> list[str]:
+    """Role ids of a guild ``Member`` author (the default role excluded); ``[]`` otherwise.
+
+    ``roles`` only resolves roles discord.py has cached, which a REST-only client may not
+    have; the member's raw role ids (``_roles``) are the fallback.
+    """
+    roles = getattr(author, "roles", None)
+    if roles:
+        return [
+            str(r.id)
+            for r in roles
+            if not (hasattr(r, "is_default") and r.is_default())
+        ]
+    return [str(i) for i in getattr(author, "_roles", None) or ()]
+
+
 def message_to_dict(message) -> dict:
     """Serialize a ``discord.Message`` to a plain, JSON-safe dict.
 
@@ -165,6 +181,8 @@ def message_to_dict(message) -> dict:
                 message.author, "display_name", message.author.name
             ),
             "bot": message.author.bot,
+            # Only a guild ``Member`` has roles; a ``User`` (a DM, a webhook) has none.
+            "role_ids": _author_role_ids(message.author),
         },
         "content": message.content,
         "clean_content": message.clean_content,
@@ -292,6 +310,53 @@ class Backend(Protocol):
         self, channel_id: str, *, private: bool = False
     ) -> list[dict]: ...
     def messages(self, channel_id: str, **kwargs) -> list[dict]: ...
+
+
+#: Mentions allowed by default in :meth:`DiscordRest.send_message`: user mentions only.
+DFLT_ALLOWED_MENTIONS = {"everyone": False, "roles": False}
+
+
+def _mention_targets(value):
+    """``True``/``False`` pass through; a list of ids becomes ``discord.Object`` s."""
+    import discord
+
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (str, bytes)):
+        raise TypeError(f"expected True, False or a list of ids, got {value!r}")
+    return [discord.Object(id=int(v)) for v in value]
+
+
+def _allowed_mentions(spec):
+    """A ``discord.AllowedMentions`` from one, or from a dict (``None`` = the safe default)."""
+    import discord
+
+    if isinstance(spec, discord.AllowedMentions):
+        return spec
+    # Merge over the safe default: naming ``users`` must not re-enable @everyone/roles.
+    spec = {**DFLT_ALLOWED_MENTIONS, **(spec or {})}
+    unknown = set(spec) - {"everyone", "roles", "users", "replied_user"}
+    if unknown:
+        raise ValueError(f"Unknown allowed_mentions keys: {sorted(unknown)}")
+    resolved = {
+        k: (_mention_targets(v) if k in ("users", "roles") else v)
+        for k, v in spec.items()
+    }
+    return discord.AllowedMentions(**resolved)
+
+
+def _send_kwargs(channel_id, *, allowed_mentions=None, reply_to=None) -> dict:
+    """The keyword arguments ``channel.send`` gets for these options."""
+    import discord
+
+    kwargs = {"allowed_mentions": _allowed_mentions(allowed_mentions)}
+    if reply_to is not None:
+        kwargs["reference"] = discord.MessageReference(
+            message_id=int(reply_to),
+            channel_id=int(channel_id),
+            fail_if_not_exists=False,
+        )
+    return kwargs
 
 
 class DiscordRest:
@@ -456,16 +521,35 @@ class DiscordRest:
 
         return self._run(fetch)
 
-    def send_message(self, channel_id: str, text: str) -> dict:
+    def send_message(
+        self,
+        channel_id: str,
+        text: str,
+        *,
+        allowed_mentions: Any = None,
+        reply_to: Optional[str] = None,
+    ) -> dict:
         """Post a message to a channel. The one write operation; needs Send Messages.
 
         Read access is what discorddol is for -- this exists so that acting on what you
         read does not require a second library.
+
+        Args:
+            allowed_mentions: which mentions in ``text`` Discord may turn into pings: a
+                ``discord.AllowedMentions`` or a dict such as
+                ``{"everyone": False, "roles": False, "users": ["123"]}`` (``users`` and
+                ``roles`` take ``True``/``False`` or a list of ids). The default,
+                :data:`DFLT_ALLOWED_MENTIONS`, blocks ``@everyone``, ``@here`` and role
+                mentions, so relaying quoted text cannot ping a whole server.
+            reply_to: id of a message in this channel to answer (a Discord reply).
         """
+        kwargs = _send_kwargs(
+            channel_id, allowed_mentions=allowed_mentions, reply_to=reply_to
+        )
 
         async def send(client):
             channel = await client.fetch_channel(int(channel_id))
-            return self.message_to_dict(await channel.send(text))
+            return self.message_to_dict(await channel.send(text, **kwargs))
 
         return self._run(send)
 

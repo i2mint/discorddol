@@ -182,9 +182,23 @@ def recover_attachments(
     }
 
 
-def post_message(channel_id: str, text: str, *, token: Optional[str] = None) -> dict:
-    """Post a message to a channel. Requires the bot to have Send Messages."""
-    return DiscordRest(token=token).send_message(channel_id, text)
+def post_message(
+    channel_id: str,
+    text: str,
+    *,
+    token: Optional[str] = None,
+    allowed_mentions: Optional[dict] = None,
+    reply_to: Optional[str] = None,
+) -> dict:
+    """Post a message to a channel. Requires the bot to have Send Messages.
+
+    ``@everyone``, ``@here`` and role mentions are not turned into pings unless
+    ``allowed_mentions`` (a dict, see ``DiscordRest.send_message``) says so;
+    ``reply_to`` is the id of a message to answer.
+    """
+    return DiscordRest(token=token).send_message(
+        channel_id, text, allowed_mentions=allowed_mentions, reply_to=reply_to
+    )
 
 
 #: The SSOT list every surface dispatches over. Add a verb here, get it everywhere.
