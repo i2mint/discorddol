@@ -69,3 +69,15 @@ def test_author_role_ids():
     message = _message(author=NS(id=1, name="ana", display_name="Ana", bot=False, roles=[everyone, mod]))
     assert message_to_dict(message)["author"]["role_ids"] == ["77"]
     assert message_to_dict(_message())["author"]["role_ids"] == []
+
+
+def test_overrides_keep_the_safe_default_for_omitted_keys():
+    am = _allowed_mentions({"users": ["5"]})
+    assert am.everyone is False and am.roles is False
+    with pytest.raises(TypeError):
+        _allowed_mentions({"users": "123"})
+
+
+def test_author_role_ids_falls_back_to_raw_ids():
+    author = NS(id=1, name="ana", display_name="Ana", bot=False, roles=[], _roles=[5, 6])
+    assert message_to_dict(_message(author=author))["author"]["role_ids"] == ["5", "6"]

@@ -145,6 +145,22 @@ def _snapshot_to_dict(snapshot) -> dict:
     }
 
 
+def _author_role_ids(author) -> list[str]:
+    """Role ids of a guild ``Member`` author (the default role excluded); ``[]`` otherwise.
+
+    ``roles`` only resolves roles discord.py has cached, which a REST-only client may not
+    have; the member's raw role ids (``_roles``) are the fallback.
+    """
+    roles = getattr(author, "roles", None)
+    if roles:
+        return [
+            str(r.id)
+            for r in roles
+            if not (hasattr(r, "is_default") and r.is_default())
+        ]
+    return [str(i) for i in getattr(author, "_roles", None) or ()]
+
+
 def message_to_dict(message) -> dict:
     """Serialize a ``discord.Message`` to a plain, JSON-safe dict.
 
@@ -166,11 +182,7 @@ def message_to_dict(message) -> dict:
             ),
             "bot": message.author.bot,
             # Only a guild ``Member`` has roles; a ``User`` (a DM, a webhook) has none.
-            "role_ids": [
-                str(r.id)
-                for r in getattr(message.author, "roles", ())
-                if not (hasattr(r, "is_default") and r.is_default())
-            ],
+            "role_ids": _author_role_ids(message.author),
         },
         "content": message.content,
         "clean_content": message.clean_content,
@@ -310,6 +322,8 @@ def _mention_targets(value):
 
     if isinstance(value, bool):
         return value
+    if isinstance(value, (str, bytes)):
+        raise TypeError(f"expected True, False or a list of ids, got {value!r}")
     return [discord.Object(id=int(v)) for v in value]
 
 
@@ -319,7 +333,8 @@ def _allowed_mentions(spec):
 
     if isinstance(spec, discord.AllowedMentions):
         return spec
-    spec = DFLT_ALLOWED_MENTIONS if spec is None else spec
+    # Merge over the safe default: naming ``users`` must not re-enable @everyone/roles.
+    spec = {**DFLT_ALLOWED_MENTIONS, **(spec or {})}
     unknown = set(spec) - {"everyone", "roles", "users", "replied_user"}
     if unknown:
         raise ValueError(f"Unknown allowed_mentions keys: {sorted(unknown)}")
