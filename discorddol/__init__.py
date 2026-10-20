@@ -23,6 +23,7 @@ no undelete, but the desktop client's on-disk cache still holds attachments it d
 
 from .base import (
     CHANNEL_KINDS,
+    DIRECT_KINDS,
     Channels,
     DictBackend,
     DiscordRest,
@@ -61,6 +62,7 @@ __all__ = [
     "channel_to_dict",
     "channel_kind",
     "CHANNEL_KINDS",
+    "DIRECT_KINDS",
     "export_guild",
     "ChannelLogs",
     "MessageContentMissing",
