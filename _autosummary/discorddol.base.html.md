@@ -57,7 +57,7 @@ promptly, instead of a bot process you have to keep alive and shut down.
 |--------------------------------------------------------------|-----------------------------------------------------------------------------------|
 | [`NotFound`](#discorddol.base.NotFound)    | Discord has no such object (HTTP 404), or does not show it to the bot.            |
 
-### discorddol.base.CHANNEL_KINDS *= {'category': 'category', 'forum': 'forum', 'media': 'media', 'news': 'announcement', 'news_thread': 'thread', 'private_thread': 'thread', 'public_thread': 'thread', 'stage_voice': 'stage', 'text': 'text', 'voice': 'voice'}*
+### discorddol.base.CHANNEL_KINDS *= {'category': 'category', 'forum': 'forum', 'group': 'group_dm', 'media': 'media', 'news': 'announcement', 'news_thread': 'thread', 'private': 'dm', 'private_thread': 'thread', 'public_thread': 'thread', 'stage_voice': 'stage', 'text': 'text', 'voice': 'voice'}*
 
 Discord’s channel type (`str(channel.type)`) -> the kind discorddol reports.
 
@@ -132,6 +132,26 @@ The threads under `channel_id` marked `archived`: public, or private ones.
 * **Return type:**
   [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
 
+#### channel(channel_id)
+
+The stored record of one channel or thread, wherever it is stored.
+
+DMs belong to no guild: store them under any key, `'@me'` by convention.
+
+```pycon
+>>> backend = DictBackend(channels={
+...     '1': [{'id': '10', 'name': 'dev', 'guild_id': '1'}],
+...     '@me': [{'id': '50', 'type': 'private', 'recipients': ['7']}],
+... })
+>>> backend.channel('10')['name']
+'dev'
+>>> channel_kind(backend.channel(50))
+'dm'
+```
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
+
 #### messages(channel_id, , limit=None, after=None, before=None, oldest_first=True, \*\*kwargs)
 
 Stored messages, filtered the way [`DiscordRest.messages()`](#discorddol.base.DiscordRest.messages) filters them.
@@ -173,6 +193,17 @@ private threads, so `private=True` on any other channel returns an empty list.
 
 * **Return type:**
   [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
+
+#### channel(channel_id)
+
+Look up one channel, thread or DM by id (see [`channel_to_dict()`](#discorddol.base.channel_to_dict)).
+
+Tells a DM ([`channel_kind()`](#discorddol.base.channel_kind) `'dm'`, with its `recipients`) from a
+server channel (with its `guild_id`). A channel the bot cannot see raises
+[`NotFound`](#discorddol.base.NotFound) or [`Forbidden`](#discorddol.base.Forbidden).
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
 
 #### channels(guild_id)
 
@@ -302,6 +333,8 @@ fixture usually means. An unknown type comes back as it is.
 'stage'
 >>> channel_kind({'id': '10'})
 'text'
+>>> channel_kind({'type': 'ChannelType.private'})
+'dm'
 ```
 
 * **Return type:**
@@ -310,6 +343,10 @@ fixture usually means. An unknown type comes back as it is.
 ### discorddol.base.channel_to_dict(channel)
 
 Serialize a channel or thread to a plain dict.
+
+A direct-message channel (a DM, or a group DM) also carries `recipients`, the ids
+of the users in it other than the bot, and `me_id`, the bot’s own user id (when
+known), so its audience can be read off the record.
 
 * **Return type:**
   [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)

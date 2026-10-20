@@ -343,6 +343,27 @@ and <code class="docutils literal notranslate"><span class="pre">channels['10']<
 </dl>
 </dd></dl>
 <dl class="py method">
+<dt class="sig sig-object py" id="discorddol.DictBackend.channel">
+<span class="sig-name descname"><span class="pre">channel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/discorddol/base.html#DictBackend.channel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a @click.prevent="window.navigator.clipboard.writeText($el.href); $el.setAttribute('data-tooltip', 'Copied!'); setTimeout(() =&gt; $el.setAttribute('data-tooltip', 'Copy link to this element'), 2000)" aria-label="Copy link to this element" class="headerlink" data-tooltip="Copy link to this element" href="#discorddol.DictBackend.channel" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#discorddol.DictBackend.channel'">¶</a></dt>
+<dd><p>The stored record of one channel or thread, wherever it is stored.</p>
+<p>DMs belong to no guild: store them under any key, <code class="docutils literal notranslate"><span class="pre">'@me'</span></code> by convention.</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><code><span id="line-1"><span class="gp">&gt;&gt;&gt; </span><span class="n">backend</span> <span class="o">=</span> <span class="n">DictBackend</span><span class="p">(</span><span class="n">channels</span><span class="o">=</span><span class="p">{</span>
+</span><span id="line-2"><span class="gp">... </span>    <span class="s1">'1'</span><span class="p">:</span> <span class="p">[{</span><span class="s1">'id'</span><span class="p">:</span> <span class="s1">'10'</span><span class="p">,</span> <span class="s1">'name'</span><span class="p">:</span> <span class="s1">'dev'</span><span class="p">,</span> <span class="s1">'guild_id'</span><span class="p">:</span> <span class="s1">'1'</span><span class="p">}],</span>
+</span><span id="line-3"><span class="gp">... </span>    <span class="s1">'@me'</span><span class="p">:</span> <span class="p">[{</span><span class="s1">'id'</span><span class="p">:</span> <span class="s1">'50'</span><span class="p">,</span> <span class="s1">'type'</span><span class="p">:</span> <span class="s1">'private'</span><span class="p">,</span> <span class="s1">'recipients'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'7'</span><span class="p">]}],</span>
+</span><span id="line-4"><span class="gp">... </span><span class="p">})</span>
+</span><span id="line-5"><span class="gp">&gt;&gt;&gt; </span><span class="n">backend</span><span class="o">.</span><span class="n">channel</span><span class="p">(</span><span class="s1">'10'</span><span class="p">)[</span><span class="s1">'name'</span><span class="p">]</span>
+</span><span id="line-6"><span class="go">'dev'</span>
+</span><span id="line-7"><span class="gp">&gt;&gt;&gt; </span><span class="n">channel_kind</span><span class="p">(</span><span class="n">backend</span><span class="o">.</span><span class="n">channel</span><span class="p">(</span><span class="mi">50</span><span class="p">))</span>
+</span><span id="line-8"><span class="go">'dm'</span>
+</span></code></pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" rel="nofollow noopener" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code><svg fill="currentColor" height="1em" stroke="none" viewbox="0 96 960 960" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M188 868q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360 336q0-17 11.5-28.5T400 296h320q17 0 28.5 11.5T760 336v320q0 17-11.5 28.5T720 696q-17 0-28.5-11.5T680 656V432L244 868q-11 11-28 11t-28-11Z"></path></svg></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
 <dt class="sig sig-object py" id="discorddol.DictBackend.messages">
 <span class="sig-name descname"><span class="pre">messages</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel_id</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">after</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">before</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">oldest_first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/discorddol/base.html#DictBackend.messages"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a @click.prevent="window.navigator.clipboard.writeText($el.href); $el.setAttribute('data-tooltip', 'Copied!'); setTimeout(() =&gt; $el.setAttribute('data-tooltip', 'Copy link to this element'), 2000)" aria-label="Copy link to this element" class="headerlink" data-tooltip="Copy link to this element" href="#discorddol.DictBackend.messages" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#discorddol.DictBackend.messages'">¶</a></dt>
 <dd><p>Stored messages, filtered the way <a class="reference internal" href="#discorddol.DiscordRest.messages" title="discorddol.DiscordRest.messages"><code class="xref py py-meth docutils literal notranslate"><span class="pre">DiscordRest.messages()</span></code></a> filters them.</p>
@@ -385,6 +406,19 @@ private threads, so <code class="docutils literal notranslate"><span class="pre"
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" rel="nofollow noopener" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code><svg fill="currentColor" height="1em" stroke="none" viewbox="0 96 960 960" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M188 868q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360 336q0-17 11.5-28.5T400 296h320q17 0 28.5 11.5T760 336v320q0 17-11.5 28.5T720 696q-17 0-28.5-11.5T680 656V432L244 868q-11 11-28 11t-28-11Z"></path></svg></a>[<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" rel="nofollow noopener" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code><svg fill="currentColor" height="1em" stroke="none" viewbox="0 96 960 960" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M188 868q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360 336q0-17 11.5-28.5T400 296h320q17 0 28.5 11.5T760 336v320q0 17-11.5 28.5T720 696q-17 0-28.5-11.5T680 656V432L244 868q-11 11-28 11t-28-11Z"></path></svg></a>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="discorddol.DiscordRest.channel">
+<span class="sig-name descname"><span class="pre">channel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/discorddol/base.html#DiscordRest.channel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a @click.prevent="window.navigator.clipboard.writeText($el.href); $el.setAttribute('data-tooltip', 'Copied!'); setTimeout(() =&gt; $el.setAttribute('data-tooltip', 'Copy link to this element'), 2000)" aria-label="Copy link to this element" class="headerlink" data-tooltip="Copy link to this element" href="#discorddol.DiscordRest.channel" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#discorddol.DiscordRest.channel'">¶</a></dt>
+<dd><p>Look up one channel, thread or DM by id (see <a class="reference internal" href="#discorddol.channel_to_dict" title="discorddol.channel_to_dict"><code class="xref py py-func docutils literal notranslate"><span class="pre">channel_to_dict()</span></code></a>).</p>
+<p>Tells a DM (<a class="reference internal" href="#discorddol.channel_kind" title="discorddol.channel_kind"><code class="xref py py-func docutils literal notranslate"><span class="pre">channel_kind()</span></code></a> <code class="docutils literal notranslate"><span class="pre">'dm'</span></code>, with its <code class="docutils literal notranslate"><span class="pre">recipients</span></code>) from a
+server channel (with its <code class="docutils literal notranslate"><span class="pre">guild_id</span></code>). A channel the bot cannot see raises
+<a class="reference internal" href="#discorddol.NotFound" title="discorddol.NotFound"><code class="xref py py-class docutils literal notranslate"><span class="pre">NotFound</span></code></a> or <a class="reference internal" href="#discorddol.Forbidden" title="discorddol.Forbidden"><code class="xref py py-class docutils literal notranslate"><span class="pre">Forbidden</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" rel="nofollow noopener" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code><svg fill="currentColor" height="1em" stroke="none" viewbox="0 96 960 960" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M188 868q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360 336q0-17 11.5-28.5T400 296h320q17 0 28.5 11.5T760 336v320q0 17-11.5 28.5T720 696q-17 0-28.5-11.5T680 656V432L244 868q-11 11-28 11t-28-11Z"></path></svg></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -556,6 +590,8 @@ fixture usually means. An unknown type comes back as it is.</p>
 </span><span id="line-4"><span class="go">'stage'</span>
 </span><span id="line-5"><span class="gp">&gt;&gt;&gt; </span><span class="n">channel_kind</span><span class="p">({</span><span class="s1">'id'</span><span class="p">:</span> <span class="s1">'10'</span><span class="p">})</span>
 </span><span id="line-6"><span class="go">'text'</span>
+</span><span id="line-7"><span class="gp">&gt;&gt;&gt; </span><span class="n">channel_kind</span><span class="p">({</span><span class="s1">'type'</span><span class="p">:</span> <span class="s1">'ChannelType.private'</span><span class="p">})</span>
+</span><span id="line-8"><span class="go">'dm'</span>
 </span></code></pre></div>
 </div>
 <dl class="field-list simple">
@@ -568,6 +604,9 @@ fixture usually means. An unknown type comes back as it is.</p>
 <dt class="sig sig-object py" id="discorddol.channel_to_dict">
 <span class="sig-prename descclassname"><span class="pre">discorddol.</span></span><span class="sig-name descname"><span class="pre">channel_to_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/discorddol/base.html#channel_to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a @click.prevent="window.navigator.clipboard.writeText($el.href); $el.setAttribute('data-tooltip', 'Copied!'); setTimeout(() =&gt; $el.setAttribute('data-tooltip', 'Copy link to this element'), 2000)" aria-label="Copy link to this element" class="headerlink" data-tooltip="Copy link to this element" href="#discorddol.channel_to_dict" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#discorddol.channel_to_dict'">¶</a></dt>
 <dd><p>Serialize a channel or thread to a plain dict.</p>
+<p>A direct-message channel (a DM, or a group DM) also carries <code class="docutils literal notranslate"><span class="pre">recipients</span></code>, the ids
+of the users in it other than the bot, and <code class="docutils literal notranslate"><span class="pre">me_id</span></code>, the bot’s own user id (when
+known), so its audience can be read off the record.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" rel="nofollow noopener" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code><svg fill="currentColor" height="1em" stroke="none" viewbox="0 96 960 960" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M188 868q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360 336q0-17 11.5-28.5T400 296h320q17 0 28.5 11.5T760 336v320q0 17-11.5 28.5T720 696q-17 0-28.5-11.5T680 656V432L244 868q-11 11-28 11t-28-11Z"></path></svg></a></span></p>
@@ -706,11 +745,13 @@ lacks permission to see. Cross-check a candidate against
 </li>
 <li><a :data-current="activeSection === '#discorddol.DictBackend'" class="reference internal" href="#discorddol.DictBackend"><code class="docutils literal notranslate"><span class="pre">DictBackend</span></code></a><ul>
 <li><a :data-current="activeSection === '#discorddol.DictBackend.archived_threads'" class="reference internal" href="#discorddol.DictBackend.archived_threads"><code class="docutils literal notranslate"><span class="pre">DictBackend.archived_threads()</span></code></a></li>
+<li><a :data-current="activeSection === '#discorddol.DictBackend.channel'" class="reference internal" href="#discorddol.DictBackend.channel"><code class="docutils literal notranslate"><span class="pre">DictBackend.channel()</span></code></a></li>
 <li><a :data-current="activeSection === '#discorddol.DictBackend.messages'" class="reference internal" href="#discorddol.DictBackend.messages"><code class="docutils literal notranslate"><span class="pre">DictBackend.messages()</span></code></a></li>
 </ul>
 </li>
 <li><a :data-current="activeSection === '#discorddol.DiscordRest'" class="reference internal" href="#discorddol.DiscordRest"><code class="docutils literal notranslate"><span class="pre">DiscordRest</span></code></a><ul>
 <li><a :data-current="activeSection === '#discorddol.DiscordRest.archived_threads'" class="reference internal" href="#discorddol.DiscordRest.archived_threads"><code class="docutils literal notranslate"><span class="pre">DiscordRest.archived_threads()</span></code></a></li>
+<li><a :data-current="activeSection === '#discorddol.DiscordRest.channel'" class="reference internal" href="#discorddol.DiscordRest.channel"><code class="docutils literal notranslate"><span class="pre">DiscordRest.channel()</span></code></a></li>
 <li><a :data-current="activeSection === '#discorddol.DiscordRest.channels'" class="reference internal" href="#discorddol.DiscordRest.channels"><code class="docutils literal notranslate"><span class="pre">DiscordRest.channels()</span></code></a></li>
 <li><a :data-current="activeSection === '#discorddol.DiscordRest.guilds'" class="reference internal" href="#discorddol.DiscordRest.guilds"><code class="docutils literal notranslate"><span class="pre">DiscordRest.guilds()</span></code></a></li>
 <li><a :data-current="activeSection === '#discorddol.DiscordRest.messages'" class="reference internal" href="#discorddol.DiscordRest.messages"><code class="docutils literal notranslate"><span class="pre">DiscordRest.messages()</span></code></a></li>
@@ -746,7 +787,7 @@ lacks permission to see. Cross-check a candidate against
 </div>
 </footer>
 </div>
-<script src="../_static/documentation_options.js?v=282f96c0"></script>
+<script src="../_static/documentation_options.js?v=1fd71caa"></script>
 <script src="../_static/doctools.js?v=fd6eb6e6"></script>
 <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
 <script src="../_static/clipboard.min.js?v=a7894cd8"></script>

@@ -1,4 +1,4 @@
-> built 2026-10-20 10:03 UTC from 6d15d49 (main) · discorddol 0.0.5. Details: build_info.json
+> built 2026-10-20 13:33 UTC from 496f17e (main) · discorddol 0.0.6. Details: build_info.json
 
 # index.html.md
 
@@ -249,7 +249,7 @@ promptly, instead of a bot process you have to keep alive and shut down.
 |--------------------------------------------------------------|-----------------------------------------------------------------------------------|
 | [`NotFound`](_autosummary/discorddol.base.html.md#discorddol.base.NotFound)    | Discord has no such object (HTTP 404), or does not show it to the bot.            |
 
-### discorddol.base.CHANNEL_KINDS *= {'category': 'category', 'forum': 'forum', 'media': 'media', 'news': 'announcement', 'news_thread': 'thread', 'private_thread': 'thread', 'public_thread': 'thread', 'stage_voice': 'stage', 'text': 'text', 'voice': 'voice'}*
+### discorddol.base.CHANNEL_KINDS *= {'category': 'category', 'forum': 'forum', 'group': 'group_dm', 'media': 'media', 'news': 'announcement', 'news_thread': 'thread', 'private': 'dm', 'private_thread': 'thread', 'public_thread': 'thread', 'stage_voice': 'stage', 'text': 'text', 'voice': 'voice'}*
 
 Discord’s channel type (`str(channel.type)`) -> the kind discorddol reports.
 
@@ -324,6 +324,26 @@ The threads under `channel_id` marked `archived`: public, or private ones.
 * **Return type:**
   [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
 
+#### channel(channel_id)
+
+The stored record of one channel or thread, wherever it is stored.
+
+DMs belong to no guild: store them under any key, `'@me'` by convention.
+
+```pycon
+>>> backend = DictBackend(channels={
+...     '1': [{'id': '10', 'name': 'dev', 'guild_id': '1'}],
+...     '@me': [{'id': '50', 'type': 'private', 'recipients': ['7']}],
+... })
+>>> backend.channel('10')['name']
+'dev'
+>>> channel_kind(backend.channel(50))
+'dm'
+```
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
+
 #### messages(channel_id, , limit=None, after=None, before=None, oldest_first=True, \*\*kwargs)
 
 Stored messages, filtered the way [`DiscordRest.messages()`](_autosummary/discorddol.base.html.md#discorddol.base.DiscordRest.messages) filters them.
@@ -365,6 +385,17 @@ private threads, so `private=True` on any other channel returns an empty list.
 
 * **Return type:**
   [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
+
+#### channel(channel_id)
+
+Look up one channel, thread or DM by id (see [`channel_to_dict()`](_autosummary/discorddol.base.html.md#discorddol.base.channel_to_dict)).
+
+Tells a DM ([`channel_kind()`](_autosummary/discorddol.base.html.md#discorddol.base.channel_kind) `'dm'`, with its `recipients`) from a
+server channel (with its `guild_id`). A channel the bot cannot see raises
+[`NotFound`](_autosummary/discorddol.base.html.md#discorddol.base.NotFound) or [`Forbidden`](_autosummary/discorddol.base.html.md#discorddol.base.Forbidden).
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
 
 #### channels(guild_id)
 
@@ -494,6 +525,8 @@ fixture usually means. An unknown type comes back as it is.
 'stage'
 >>> channel_kind({'id': '10'})
 'text'
+>>> channel_kind({'type': 'ChannelType.private'})
+'dm'
 ```
 
 * **Return type:**
@@ -502,6 +535,10 @@ fixture usually means. An unknown type comes back as it is.
 ### discorddol.base.channel_to_dict(channel)
 
 Serialize a channel or thread to a plain dict.
+
+A direct-message channel (a DM, or a group DM) also carries `recipients`, the ids
+of the users in it other than the bot, and `me_id`, the bot’s own user id (when
+known), so its audience can be read off the record.
 
 * **Return type:**
   [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
@@ -896,6 +933,26 @@ The threads under `channel_id` marked `archived`: public, or private ones.
 * **Return type:**
   [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
 
+#### channel(channel_id)
+
+The stored record of one channel or thread, wherever it is stored.
+
+DMs belong to no guild: store them under any key, `'@me'` by convention.
+
+```pycon
+>>> backend = DictBackend(channels={
+...     '1': [{'id': '10', 'name': 'dev', 'guild_id': '1'}],
+...     '@me': [{'id': '50', 'type': 'private', 'recipients': ['7']}],
+... })
+>>> backend.channel('10')['name']
+'dev'
+>>> channel_kind(backend.channel(50))
+'dm'
+```
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
+
 #### messages(channel_id, , limit=None, after=None, before=None, oldest_first=True, \*\*kwargs)
 
 Stored messages, filtered the way [`DiscordRest.messages()`](_autosummary/discorddol.html.md#discorddol.DiscordRest.messages) filters them.
@@ -937,6 +994,17 @@ private threads, so `private=True` on any other channel returns an empty list.
 
 * **Return type:**
   [`list`](https://docs.python.org/3/builtins/stdtypes.html#list)[[`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)]
+
+#### channel(channel_id)
+
+Look up one channel, thread or DM by id (see [`channel_to_dict()`](_autosummary/discorddol.html.md#discorddol.channel_to_dict)).
+
+Tells a DM ([`channel_kind()`](_autosummary/discorddol.html.md#discorddol.channel_kind) `'dm'`, with its `recipients`) from a
+server channel (with its `guild_id`). A channel the bot cannot see raises
+[`NotFound`](_autosummary/discorddol.html.md#discorddol.NotFound) or [`Forbidden`](_autosummary/discorddol.html.md#discorddol.Forbidden).
+
+* **Return type:**
+  [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
 
 #### channels(guild_id)
 
@@ -1088,6 +1156,8 @@ fixture usually means. An unknown type comes back as it is.
 'stage'
 >>> channel_kind({'id': '10'})
 'text'
+>>> channel_kind({'type': 'ChannelType.private'})
+'dm'
 ```
 
 * **Return type:**
@@ -1096,6 +1166,10 @@ fixture usually means. An unknown type comes back as it is.
 ### discorddol.channel_to_dict(channel)
 
 Serialize a channel or thread to a plain dict.
+
+A direct-message channel (a DM, or a group DM) also carries `recipients`, the ids
+of the users in it other than the bot, and `me_id`, the bot’s own user id (when
+known), so its audience can be read off the record.
 
 * **Return type:**
   [`dict`](https://docs.python.org/3/builtins/stdtypes.html#dict)
@@ -1456,7 +1530,7 @@ Render a channel as readable transcript text – the form to feed an LLM.
 
 # About this build
 
-This documentation was built on **2026-10-20 10:03 UTC** from commit <a href="https://github.com/i2mint/discorddol/commit/6d15d499357441ab3e71cffe9133f5d978c6e061"><code>6d15d49</code></a> on branch <code>main</code>, for **discorddol 0.0.5** (from <code>pyproject.toml</code>).
+This documentation was built on **2026-10-20 13:33 UTC** from commit <a href="https://github.com/i2mint/discorddol/commit/496f17e0aade7c8b807fb8da324b68325f10b0c0"><code>496f17e</code></a> on branch <code>main</code>, for **discorddol 0.0.6** (from <code>pyproject.toml</code>).
 
 #### NOTE
 Nothing suggests a mismatch: the tree was clean at the commit above, and the documented version is the one on PyPI.
@@ -1465,7 +1539,7 @@ Nothing suggests a mismatch: the tree was clean at the commit above, and the doc
 
 |                     |                                                                                                                                                          |
 |---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Commit              | <a href="https://github.com/i2mint/discorddol/commit/6d15d499357441ab3e71cffe9133f5d978c6e061"><code>6d15d499357441ab3e71cffe9133f5d978c6e061</code></a> |
+| Commit              | <a href="https://github.com/i2mint/discorddol/commit/496f17e0aade7c8b807fb8da324b68325f10b0c0"><code>496f17e0aade7c8b807fb8da324b68325f10b0c0</code></a> |
 | Branch              | <code>main</code>                                                                                                                                        |
 | Tags at this commit | none                                                                                                                                                     |
 | Working tree        | clean                                                                                                                                                    |
@@ -1476,15 +1550,15 @@ Nothing suggests a mismatch: the tree was clean at the commit above, and the doc
 |              |                                                                                            |
 |--------------|--------------------------------------------------------------------------------------------|
 | Repository   | <code>i2mint/discorddol</code>                                                             |
-| Run          | <a href="https://github.com/i2mint/discorddol/actions/runs/39404970548">39404970548</a>    |
+| Run          | <a href="https://github.com/i2mint/discorddol/actions/runs/39431273698">39431273698</a>    |
 | Ref          | <code>refs/heads/main</code>                                                               |
-| Event commit | <code>6d15d499357441ab3e71cffe9133f5d978c6e061</code> (in the history of the built commit) |
+| Event commit | <code>496f17e0aade7c8b807fb8da324b68325f10b0c0</code> (in the history of the built commit) |
 
 ## Tools
 
 |          |         |
 |----------|---------|
-| epythet  | 0.2.18  |
+| epythet  | 0.2.20  |
 | Sphinx   | 9.1.1   |
 | docutils | 0.22.4  |
 | Python   | 3.12.15 |
@@ -1503,14 +1577,14 @@ Nothing suggests a mismatch: the tree was clean at the commit above, and the doc
 
 ## Package on PyPI
 
-Latest release: <a href="https://pypi.org/project/discorddol/0.0.5/">0.0.5</a>, the same as the documented version.
+Latest release: <a href="https://pypi.org/project/discorddol/0.0.6/">0.0.6</a>, the same as the documented version.
 
 ## Reproduce
 
 ```bash
 git clone https://github.com/i2mint/discorddol && cd discorddol
-git checkout 6d15d499357441ab3e71cffe9133f5d978c6e061
-pip install "epythet==0.2.18"
+git checkout 496f17e0aade7c8b807fb8da324b68325f10b0c0
+pip install "epythet==0.2.20"
 epythet quickstart . --ignore tests/ scrap/ examples/
 ```
 

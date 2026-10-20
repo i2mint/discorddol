@@ -1,36 +1,36 @@
 {
   "schema_version": 1,
-  "built_at": "2026-10-20T10:03:26Z",
+  "built_at": "2026-10-20T13:33:59Z",
   "package": {
     "name": "discorddol",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "display_name": "discorddol",
     "source": "pyproject.toml"
   },
   "git": {
     "available": true,
-    "commit": "6d15d499357441ab3e71cffe9133f5d978c6e061",
-    "short_commit": "6d15d49",
+    "commit": "496f17e0aade7c8b807fb8da324b68325f10b0c0",
+    "short_commit": "496f17e",
     "branch": "main",
     "tags": [],
     "dirty": false,
     "remote_url": "https://github.com/i2mint/discorddol",
-    "commit_url": "https://github.com/i2mint/discorddol/commit/6d15d499357441ab3e71cffe9133f5d978c6e061",
+    "commit_url": "https://github.com/i2mint/discorddol/commit/496f17e0aade7c8b807fb8da324b68325f10b0c0",
     "error": null
   },
   "ci": {
     "provider": "github",
     "repository": "i2mint/discorddol",
-    "sha": "6d15d499357441ab3e71cffe9133f5d978c6e061",
+    "sha": "496f17e0aade7c8b807fb8da324b68325f10b0c0",
     "sha_in_history": true,
     "ref": "refs/heads/main",
     "ref_name": "main",
-    "run_id": "39404970548",
-    "run_url": "https://github.com/i2mint/discorddol/actions/runs/39404970548",
+    "run_id": "39431273698",
+    "run_url": "https://github.com/i2mint/discorddol/actions/runs/39431273698",
     "server_url": "https://github.com"
   },
   "tools": {
-    "epythet": "0.2.18",
+    "epythet": "0.2.20",
     "sphinx": "9.1.1",
     "docutils": "0.22.4",
     "python": "3.12.15"
@@ -56,15 +56,15 @@
   },
   "site": {
     "modules_documented": 5,
-    "objects_documented": 79
+    "objects_documented": 83
   },
   "pypi": {
     "checked": true,
-    "latest": "0.0.5",
+    "latest": "0.0.6",
     "relation": "same",
     "error": null
   },
-  "reproduce": "git clone https://github.com/i2mint/discorddol && cd discorddol\ngit checkout 6d15d499357441ab3e71cffe9133f5d978c6e061\npip install \"epythet==0.2.18\"\nepythet quickstart . --ignore tests/ scrap/ examples/",
+  "reproduce": "git clone https://github.com/i2mint/discorddol && cd discorddol\ngit checkout 496f17e0aade7c8b807fb8da324b68325f10b0c0\npip install \"epythet==0.2.20\"\nepythet quickstart . --ignore tests/ scrap/ examples/",
   "warnings": [],
   "alignment": {
     "aligned": true,
