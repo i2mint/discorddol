@@ -210,10 +210,15 @@ def message_to_dict(message) -> dict:
 
 
 def channel_to_dict(channel) -> dict:
-    """Serialize a channel or thread to a plain dict."""
+    """Serialize a channel or thread to a plain dict.
+
+    A direct-message channel (a DM, or a group DM) also carries ``recipients``, the ids
+    of the users in it other than the bot, and ``me_id``, the bot's own user id (when
+    known), so its audience can be read off the record.
+    """
     guild = getattr(channel, "guild", None)
     is_thread = type(channel).__name__ == "Thread"
-    return {
+    record = {
         "id": str(channel.id),
         "name": getattr(channel, "name", None),
         "type": str(getattr(channel, "type", type(channel).__name__)),
@@ -243,6 +248,13 @@ def channel_to_dict(channel) -> dict:
             else None
         ),
     }
+    if channel_kind(record) in DIRECT_KINDS:
+        record["recipients"] = [
+            str(user.id) for user in getattr(channel, "recipients", None) or ()
+        ]
+        me = getattr(channel, "me", None)
+        record["me_id"] = str(me.id) if getattr(me, "id", None) else None
+    return record
 
 
 #: Discord's channel type (``str(channel.type)``) -> the kind discorddol reports.
@@ -257,7 +269,12 @@ CHANNEL_KINDS = {
     "category": "category",
     "voice": "voice",
     "stage_voice": "stage",
+    "private": "dm",
+    "group": "group_dm",
 }
+
+#: Kinds of direct-message channel: no guild, and the people in them are listed.
+DIRECT_KINDS = frozenset({"dm", "group_dm"})
 
 #: Kinds with no message history of their own: a forum's messages are in its posts,
 #: which are threads, and a category only groups other channels.
@@ -276,6 +293,8 @@ def channel_kind(record: dict) -> str:
     'stage'
     >>> channel_kind({'id': '10'})
     'text'
+    >>> channel_kind({'type': 'ChannelType.private'})
+    'dm'
     """
     raw = str(record.get("type") or "text").rsplit(".", 1)[-1]
     return CHANNEL_KINDS.get(raw, raw)
@@ -295,7 +314,7 @@ class NotFound(LookupError):
 
 
 class Backend(Protocol):
-    """What a discorddol backend must provide. Five methods, all returning plain dicts.
+    """What a discorddol backend must provide. Six methods, all returning plain dicts.
 
     ``channels`` lists a guild's channels together with its active threads. A backend
     raises a :class:`PermissionError` (such as :class:`Forbidden`) when it is refused
@@ -305,6 +324,7 @@ class Backend(Protocol):
 
     def guilds(self) -> list[dict]: ...
     def channels(self, guild_id: str) -> list[dict]: ...
+    def channel(self, channel_id: str) -> dict: ...
     def threads(self, channel_id: str) -> list[dict]: ...
     def archived_threads(
         self, channel_id: str, *, private: bool = False
@@ -429,6 +449,19 @@ class DiscordRest:
             found = list(await guild.fetch_channels())
             found.extend(await guild.active_threads())
             return [channel_to_dict(c) for c in found]
+
+        return self._run(fetch)
+
+    def channel(self, channel_id: str) -> dict:
+        """Look up one channel, thread or DM by id (see :func:`channel_to_dict`).
+
+        Tells a DM (:func:`channel_kind` ``'dm'``, with its ``recipients``) from a
+        server channel (with its ``guild_id``). A channel the bot cannot see raises
+        :class:`NotFound` or :class:`Forbidden`.
+        """
+
+        async def fetch(client):
+            return channel_to_dict(await client.fetch_channel(int(channel_id)))
 
         return self._run(fetch)
 
@@ -586,6 +619,27 @@ class DictBackend:
 
     def channels(self, guild_id: str) -> list[dict]:
         return list(self._channels.get(str(guild_id), ()))
+
+    def channel(self, channel_id: str) -> dict:
+        """The stored record of one channel or thread, wherever it is stored.
+
+        DMs belong to no guild: store them under any key, ``'@me'`` by convention.
+
+        >>> backend = DictBackend(channels={
+        ...     '1': [{'id': '10', 'name': 'dev', 'guild_id': '1'}],
+        ...     '@me': [{'id': '50', 'type': 'private', 'recipients': ['7']}],
+        ... })
+        >>> backend.channel('10')['name']
+        'dev'
+        >>> channel_kind(backend.channel(50))
+        'dm'
+        """
+        wanted = str(channel_id)
+        for records in (*self._channels.values(), *self._threads.values()):
+            for record in records:
+                if str(record.get("id")) == wanted:
+                    return dict(record)
+        raise NotFound(f"no channel {wanted} in this DictBackend")
 
     def threads(self, channel_id: str) -> list[dict]:
         return list(self._threads.get(str(channel_id), ()))
